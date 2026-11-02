@@ -1,0 +1,7 @@
+Pint's Dungeon Journal - Changelog
+
+v1.0
+- First public release: the Dungeon Journal from Pints Quest Book as its own add-on.
+- 33 dungeons and raids with lore, bosses and loot; "Only gear I can use" filter.
+- Chronicle of runs: date, duration, company and loot, recorded automatically; all-characters view.
+- The cover is titled with the character you're playing.
