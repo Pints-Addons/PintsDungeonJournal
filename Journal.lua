@@ -363,6 +363,8 @@ for _, e in ipairs({ "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA", "GROUP_RO
 end
 ev:SetScript("OnEvent", function(_, event, a1, ...)
   if not J() then return end
+  -- (WoW Forever can hide chat text from add-ons in some places: skip those messages)
+  if type(issecretvalue) == "function" and issecretvalue(a1) then return end
   if event == "COMBAT_LOG_EVENT_UNFILTERED" then
     local _, sub, _, _, _, _, _, destGUID, destName = CombatLogGetCurrentEventInfo()
     if sub == "UNIT_DIED" and destName and destGUID and not destGUID:find("^Player") then
