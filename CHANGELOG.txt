@@ -1,5 +1,10 @@
 Pint's Dungeon Journal - Changelog
 
+v1.1.1
+- WoW Forever: characters are known by their full name (first and second, e.g. "Pint Waterboy"), so characters that
+  share a first name no longer share one record. Classic Era is unchanged.
+- The cover shows your full name on WoW Forever.
+
 v1.1
 - Drop log: every boss you loot is recorded - what it dropped, out of how many kills - kept separately for
   Classic Era and WoW Forever.

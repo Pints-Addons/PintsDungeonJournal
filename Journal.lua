@@ -12,7 +12,7 @@ local GetItemInfo = GetItemInfo or (C_Item and C_Item.GetItemInfo)
 local GetItemIcon = GetItemIcon or (C_Item and C_Item.GetItemIconByID)
 
 local function db() return NS.DB and NS.DB() end
-local function CK() return (GetRealmName() or "") .. "." .. (UnitName("player") or "") end
+local function CK() return (GetRealmName() or "") .. "." .. ((GetUnitName and GetUnitName("player", false) or UnitName("player")) or "") end
 local function Say(msg) print("|cffd4a24cDungeon Journal|r: " .. msg) end
 
 local JD = PintsJournalData
@@ -230,7 +230,7 @@ end
 -- the company standing in the dungeon when the final boss fell
 local function Company(run)
   NoteGroup(run)
-  local out, me = {}, UnitName("player")
+  local out, me = {}, (GetUnitName and GetUnitName("player", false) or UnitName("player"))
   for _, unit in ipairs(UnitsInGroup()) do
     local name, realm = UnitName(unit)
     if name then

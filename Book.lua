@@ -138,7 +138,7 @@ end
 
 local function Text(s)
   if not s or s == "" then return "" end
-  local name, class, race = UnitName("player"), UnitClass("player"), UnitRace("player")
+  local name, class, race = (GetUnitName and GetUnitName("player", false) or UnitName("player")), UnitClass("player"), UnitRace("player")
   local female = UnitSex("player") == 3
   s = s:gsub("%$[Bb]", "\n"):gsub("%$[Nn]", name or ""):gsub("%$[Cc]", (class or ""):lower()):gsub("%$[Rr]", race or "")
   s = s:gsub("%$[Gg]%s*([^:;]-)%s*:%s*([^;]-)%s*;", function(m, f) return female and f or m end)
@@ -934,7 +934,7 @@ local function ApplyTheme()
     local f = win.face
     f.ring:SetVertexColor(ft.metal[1], ft.metal[2], ft.metal[3])
     f.crest:SetTexture(ft.crest); f.crest:SetTexCoord(0, 0.62, 0, 0.62)
-    f.title:SetText((UnitName("player") or "Adventurer") .. (journal and "'s\nDungeon Journal" or "'s\nQuest Book")); f.title:SetTextColor(ft.hi[1], ft.hi[2], ft.hi[3])
+    f.title:SetText(((GetUnitName and GetUnitName("player", false) or UnitName("player")) or "Adventurer") .. (journal and "'s\nDungeon Journal" or "'s\nQuest Book")); f.title:SetTextColor(ft.hi[1], ft.hi[2], ft.hi[3])
     f.sub:SetText(journal and ("of dark places delved by a %s %s"):format(UnitRace("player") or "", UnitClass("player") or "")
       or ("being the true account of a %s %s"):format(UnitRace("player") or "", UnitClass("player") or ""))
     f.sub:SetTextColor(cc.r, cc.g, cc.b)
@@ -944,8 +944,8 @@ local function ApplyTheme()
     f.born:SetText(QB.BornLine()); f.born:SetTextColor(ft.metal[1], ft.metal[2], ft.metal[3])
   end
   -- whose tales these are
-  win.byline:SetText((journal and "The dungeons of %s, %s %s" or "The tales of %s, %s %s"):format(UnitName("player") or "", UnitRace("player") or "", UnitClass("player") or ""))
-  win.title:SetText((UnitName("player") or "Adventurer") .. (journal and "'s Dungeon Journal" or "'s Quest Book")); win.emboss:SetText(win.title:GetText())
+  win.byline:SetText((journal and "The dungeons of %s, %s %s" or "The tales of %s, %s %s"):format((GetUnitName and GetUnitName("player", false) or UnitName("player")) or "", UnitRace("player") or "", UnitClass("player") or ""))
+  win.title:SetText(((GetUnitName and GetUnitName("player", false) or UnitName("player")) or "Adventurer") .. (journal and "'s Dungeon Journal" or "'s Quest Book")); win.emboss:SetText(win.title:GetText())
   -- long names: shrink the lettering so the title stays clear of the crest
   local tsz = 24
   win.title:SetFont("Fonts\\MORPHEUS.TTF", tsz, ""); win.emboss:SetFont("Fonts\\MORPHEUS.TTF", tsz, "")
@@ -2092,13 +2092,13 @@ end
 
 -- the day this character entered the world. The game doesn't tell addons a character's creation date, so the
 -- Storybook keeps the first day it met the character, and you can record the true date with /qb born.
-local function CK() return (GetRealmName() or "") .. "." .. (UnitName("player") or "") end
+local function CK() return (GetRealmName() or "") .. "." .. ((GetUnitName and GetUnitName("player", false) or UnitName("player")) or "") end
 function QB.BornLine()
   db.born = db.born or {}; db.firstSeen = db.firstSeen or {}
   local ck = CK()
   local played = ""
   local L = _G.PintsLedgerDB and _G.PintsLedgerDB.chars and _G.PintsLedgerDB.chars[GetRealmName() or ""]
-  local rec = L and L[UnitName("player") or ""]
+  local rec = L and L[(GetUnitName and GetUnitName("player", false) or UnitName("player")) or ""]
   if rec and rec.played and rec.played > 0 then
     local d, h = math.floor(rec.played / 86400), math.floor(rec.played % 86400 / 3600)
     played = ("\n%s in Azeroth so far"):format(d > 0 and (d .. " day" .. (d == 1 and "" or "s") .. ", " .. h .. " hour" .. (h == 1 and "" or "s")) or (h .. " hour" .. (h == 1 and "" or "s")))
@@ -2173,7 +2173,7 @@ function QB.AbandonSelected()
 end
 
 -- celebrate finishing every quest in a zone (once per character per zone)
-local function CharKey() return (GetRealmName() or "") .. "." .. (UnitName("player") or "") end
+local function CharKey() return (GetRealmName() or "") .. "." .. ((GetUnitName and GetUnitName("player", false) or UnitName("player")) or "") end
 local function CheckZoneComplete(zone, silent)
   if not zone or not D then return end
   local counts, done = ZoneStats()
@@ -2316,16 +2316,16 @@ ev:SetScript("OnEvent", function(self, event, arg1)
       db.journalImported = true
     end
     db.firstSeen = db.firstSeen or {}
-    local ck = (GetRealmName() or "") .. "." .. (UnitName("player") or "")
+    local ck = (GetRealmName() or "") .. "." .. ((GetUnitName and GetUnitName("player", false) or UnitName("player")) or "")
     db.firstSeen[ck] = db.firstSeen[ck] or time()
     BuildIndex()
     local icon = "Interface\\AddOns\\PintsDungeonJournal\\Icon"
-    local function Tip(tt) tt:AddLine((UnitName("player") or "") .. "'s Quest Book"); tt:AddLine("Click: open the Quest Book for this zone", 1, 1, 1); tt:AddLine("Right-click: your current quests", 1, 1, 1) end
+    local function Tip(tt) tt:AddLine(((GetUnitName and GetUnitName("player", false) or UnitName("player")) or "") .. "'s Quest Book"); tt:AddLine("Click: open the Quest Book for this zone", 1, 1, 1); tt:AddLine("Right-click: your current quests", 1, 1, 1) end
     -- the Dungeon Journal's own minimap button
     do
       db.journalMinimap = db.journalMinimap or {}
       local jicon = "Interface\\AddOns\\PintsDungeonJournal\\Icon"
-      local function JTip(tt) tt:AddLine((UnitName("player") or "") .. "'s Dungeon Journal"); tt:AddLine("Click: open the Dungeon Journal", 1, 1, 1); tt:AddLine("/dj or /journal", 0.6, 0.6, 0.6) end
+      local function JTip(tt) tt:AddLine(((GetUnitName and GetUnitName("player", false) or UnitName("player")) or "") .. "'s Dungeon Journal"); tt:AddLine("Click: open the Dungeon Journal", 1, 1, 1); tt:AddLine("/dj or /journal", 0.6, 0.6, 0.6) end
       local LDBj = LibStub and LibStub("LibDataBroker-1.1", true)
       local Iconj = LibStub and LibStub("LibDBIcon-1.0", true)
       if LDBj and Iconj then
