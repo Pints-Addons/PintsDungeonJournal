@@ -1,4 +1,4 @@
-Pint's Dungeon Journal v1.0 - every dungeon and raid, in a book with your name on it
+Pint's Dungeon Journal v1.1 - every dungeon and raid, in a book with your name on it
 (WoW Classic Era / Hardcore / Forever)
 
 REQUIRES
@@ -24,6 +24,10 @@ HOW TO USE
     Wings that share one instance (Scarlet Monastery, Dire Maul, Blackrock Spire, Stratholme)
     are told apart by which bosses die.
 
+  - Drop log: every boss you loot is recorded (separately for Classic Era and Forever). Each item shows how
+    often you've seen it drop ("seen 2/5"), and loot or bosses that aren't in the Classic data are added in
+    green as "new" - handy for spotting what changed in WoW Forever.
+
   Buttons: Choose a dungeon, Chronicle of runs, Prev. / Next dungeon, Close book.
 
 NOTES
@@ -36,3 +40,7 @@ LICENSE
 
 Pint's Dungeon Journal - by Jake (Pint's Add-ons), built with Claude.
 World of Warcraft names and game data are the property of Blizzard Entertainment.
+
+FEEDBACK
+  Report a bug or suggest an idea: https://github.com/Pints-Addons/PintsDungeonJournal/issues
+  Source code: https://github.com/Pints-Addons/PintsDungeonJournal

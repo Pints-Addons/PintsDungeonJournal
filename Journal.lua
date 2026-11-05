@@ -4,7 +4,13 @@
 --              class) and the loot you received.
 -- Runs are watched from the moment you zone in. A run is written into the chronicle when a final boss dies; anything
 -- looted after that (and the rest of the bosses) is added to the same entry until you leave for good.
+-- Drop log: every boss corpse you open the loot window on is recorded (what it dropped, out of how many kills), kept
+-- separately for Classic Era and WoW Forever, so changed or new Forever loot shows up next to the Classic data.
 local ADDON, NS = ...
+-- Compatibility: WoW Forever runs on the modern game client, where these older functions moved or were renamed.
+local GetItemInfo = GetItemInfo or (C_Item and C_Item.GetItemInfo)
+local GetItemIcon = GetItemIcon or (C_Item and C_Item.GetItemIconByID)
+
 local function db() return NS.DB and NS.DB() end
 local function CK() return (GetRealmName() or "") .. "." .. (UnitName("player") or "") end
 local function Say(msg) print("|cffd4a24cDungeon Journal|r: " .. msg) end
@@ -122,6 +128,65 @@ end
 -- quality colours deep enough to read on parchment
 local QCOL = { [2] = { 0.06, 0.42, 0.04 }, [3] = { 0.02, 0.28, 0.62 }, [4] = { 0.42, 0.12, 0.62 }, [5] = { 0.74, 0.36, 0.00 } }
 local LINKQ = { ["1eff00"] = 2, ["0070dd"] = 3, ["a335ee"] = 4, ["ff8000"] = 5 }
+
+---------------------------------------------------------------- drop log
+-- db.drops[flavor][mapID] = { name = instance name, bosses = { [creature] = { kills = n, items = { [itemID] = times } } } }
+local FLAVOR = ((select(4, GetBuildInfo())) or 0) >= 16000 and "forever" or "classic"
+NS.JournalFlavor = FLAVOR
+local deadNames, openedCorpse = {}, {}      -- this session: corpse GUID -> name; corpse GUID -> { itemID = true }
+local function Drops(mapID)
+  local d = db(); if not d then return end
+  d.drops = d.drops or {}
+  d.drops[FLAVOR] = d.drops[FLAVOR] or {}
+  if mapID == nil then return d.drops[FLAVOR] end
+  local m = d.drops[FLAVOR][mapID]
+  if not m then m = { bosses = {} }; d.drops[FLAVOR][mapID] = m end
+  return m
+end
+NS.JournalDrops = Drops
+local function LinkQuality(link)
+  local q = select(3, GetItemInfo(link))
+  if q then return q end
+  local hex = link:match("|c%x%x(%x%x%x%x%x%x)")
+  return hex and ({ ["9d9d9d"] = 0, ["ffffff"] = 1, ["1eff00"] = 2, ["0070dd"] = 3, ["a335ee"] = 4, ["ff8000"] = 5 })[hex:lower()] or 1
+end
+local function OnLootOpened()
+  local inInst, kind = IsInInstance()
+  if not inInst or (kind ~= "party" and kind ~= "raid") then return end
+  if not GetLootSourceInfo then return end
+  local instName, _, _, _, _, _, _, mapID = GetInstanceInfo()
+  if not mapID then return end
+  local known = BYMAP[mapID] ~= nil
+  local m
+  for slot = 1, (GetNumLootItems() or 0) do
+    local link = GetLootSlotLink(slot)
+    local id = link and tonumber(link:match("item:(%d+)"))
+    if id then
+      local src = { GetLootSourceInfo(slot) }
+      for k = 1, #src, 2 do
+        local guid = src[k]
+        local name = guid and deadNames[guid]
+        if name and not guid:find("^Player") then
+          name = ALIAS[name] or name
+          m = m or Drops(mapID)
+          m.name = m.name or instName
+          local boss = m.bosses[name]
+          -- its bosses (from the journal, or any boss encounter the game reports here - that catches new Forever bosses);
+          -- in a dungeon the journal doesn't have yet, also anything that drops rare or better
+          local enc = m.enc and m.enc[name]
+          local track = (known and BOSSDUN[mapID][name]) or enc or (not known and (boss or LinkQuality(link) >= 3))
+          if track then
+            if not boss then boss = { kills = 0, items = {} }; m.bosses[name] = boss end
+            local seen = openedCorpse[guid]
+            if not seen then seen = {}; openedCorpse[guid] = seen; boss.kills = boss.kills + 1 end
+            if not seen[id] then seen[id] = true; boss.items[id] = (boss.items[id] or 0) + 1 end
+          end
+        end
+      end
+    end
+  end
+  if m and NS.JournalRefresh then NS.JournalRefresh() end
+end
 
 ---------------------------------------------------------------- run tracking
 local function Now() return time() end
@@ -290,13 +355,31 @@ local function OnLoot(msg)
 end
 
 local ev = CreateFrame("Frame")
+-- the modern game client (WoW Forever) doesn't let add-ons read the combat log; boss kills there come from ENCOUNTER_END
+local NO_COMBAT_LOG = type(issecretvalue) == "function"
 for _, e in ipairs({ "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA", "GROUP_ROSTER_UPDATE", "COMBAT_LOG_EVENT_UNFILTERED",
-  "CHAT_MSG_LOOT", "CHAT_MSG_SYSTEM", "UNIT_LEVEL" }) do pcall(ev.RegisterEvent, ev, e) end
-ev:SetScript("OnEvent", function(_, event, a1)
+  "CHAT_MSG_LOOT", "CHAT_MSG_SYSTEM", "UNIT_LEVEL", "LOOT_OPENED", "ENCOUNTER_END" }) do
+  if not (NO_COMBAT_LOG and e == "COMBAT_LOG_EVENT_UNFILTERED") then pcall(ev.RegisterEvent, ev, e) end
+end
+ev:SetScript("OnEvent", function(_, event, a1, ...)
   if not J() then return end
   if event == "COMBAT_LOG_EVENT_UNFILTERED" then
     local _, sub, _, _, _, _, _, destGUID, destName = CombatLogGetCurrentEventInfo()
-    if sub == "UNIT_DIED" and destName and destGUID and not destGUID:find("^Player") then OnBossDied(destName) end
+    if sub == "UNIT_DIED" and destName and destGUID and not destGUID:find("^Player") then
+      deadNames[destGUID] = destName
+      OnBossDied(destName)
+    end
+    return
+  end
+  if event == "LOOT_OPENED" then OnLootOpened(); return end
+  if event == "ENCOUNTER_END" then
+    -- a boss encounter was won: remember its name for this instance so its corpse's loot is logged
+    local encName, _, _, success = ...          -- a1 is the encounter ID
+    if success == 1 and encName then
+      local instName, _, _, _, _, _, _, mapID = GetInstanceInfo()
+      local m = mapID and Drops(mapID)
+      if m then m.name = m.name or instName; m.enc = m.enc or {}; m.enc[encName] = true end
+    end
     return
   end
   if event == "CHAT_MSG_LOOT" then if a1 then OnLoot(a1) end; return end
@@ -374,6 +457,7 @@ local function ItemTip(self)
   GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
   if self.link then GameTooltip:SetHyperlink(self.link:gsub("x%d+$", "")) else GameTooltip:SetHyperlink("item:" .. self.id) end
   if self.chance then GameTooltip:AddLine(("Drop chance: about %d%%"):format(self.chance), 0.8, 0.8, 0.8) end
+  if self.seen then GameTooltip:AddLine(self.seen, 0.4, 0.9, 0.4) end
   GameTooltip:Show()
 end
 local function ItemClick(self)
@@ -603,12 +687,24 @@ local function RenderSpoils(d)
   local finals = {}
   for _, f in ipairs(d[7]) do finals[f] = true end
   local y, bi, ii, shownItems, hidden = 0, 0, 0, 0, 0
-  for _, b in ipairs(d[9]) do
+  local obs = (Drops() or {})[d[1]]
+  local where = (FLAVOR == "forever") and "in Forever" or "by you"
+  local bossList = {}
+  for _, b in ipairs(d[9]) do bossList[#bossList + 1] = b end
+  if obs then   -- bosses you've looted here that the Classic data doesn't have (new in Forever)
+    local listed = {}
+    for _, b in ipairs(d[9]) do listed[b[1]] = true end
+    for name in pairs(obs.bosses) do
+      if not listed[name] and BOSSDUN[d[1]] and not BOSSDUN[d[1]][name] then bossList[#bossList + 1] = { name, "?", {}, new = true } end
+    end
+  end
+  for _, b in ipairs(bossList) do
     bi = bi + 1
     local h = BossRow(bi)
     h:ClearAllPoints(); h:SetPoint("TOPLEFT", 0, -y)
     h.name:SetText(b[1]); Ink(h.name, finals[b[1]] and B.RUBRIC or B.INK)
-    h.lvl:SetText((finals[b[1]] and "final boss  -  " or "") .. "level " .. b[2])
+    h.lvl:SetText(b.new and ("|cff1a6a1anew " .. where .. "|r") or ((finals[b[1]] and "final boss  -  " or "") .. "level " .. b[2]))
+    local ob = obs and obs.bosses[b[1]]
     local n = k[b[1]] or 0
     h.kills:SetText(n > 0 and ("|cff1a6a1aslain " .. n .. (n == 1 and " time" or " times") .. "|r") or "|cff8a7050not yet slain|r")
     h:Show()
@@ -624,7 +720,7 @@ local function RenderSpoils(d)
           ii = ii + 1; any = true; shownItems = shownItems + 1
           local r = ItemRow(ii, S.list, itemRows)
           r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y)
-          r.id, r.link, r.chance = id, nil, ch
+          r.id, r.link, r.chance, r.seen = id, nil, ch, nil
           r.icon:SetTexture((GetItemIcon and GetItemIcon(id)) or "Interface\\Icons\\INV_Misc_QuestionMark")
           r.icon:SetDesaturated(not ok); r.icon:SetAlpha(ok and 1 or 0.55)
           local c = QCOL[it[4]] or B.INK
@@ -636,6 +732,46 @@ local function RenderSpoils(d)
           if kind ~= "" then parts[#parts + 1] = kind end
           if reqTxt ~= "" then parts[#parts + 1] = reqTxt end
           parts[#parts + 1] = ch .. "%"
+          if ob and ob.kills > 0 then
+            local n = ob.items[id] or 0
+            parts[#parts + 1] = (n > 0 and "|cff1a6a1a" or "|cff8a7050") .. "seen " .. n .. "/" .. ob.kills .. "|r"
+            r.seen = ("Seen dropping %s: %d of %d kills you looted"):format(where, n, ob.kills)
+          end
+          r.right:SetText(table.concat(parts, "  -  "))
+          r:Show()
+          y = y + 20
+        else
+          hidden = hidden + 1
+        end
+      end
+    end
+    -- items you've seen this boss drop that the Classic data doesn't list
+    if ob then
+      local inList = {}
+      for x = 1, #loot, 2 do inList[loot[x]] = true end
+      local extra = {}
+      for id, n in pairs(ob.items) do if not inList[id] then extra[#extra + 1] = id end end
+      table.sort(extra, function(a, c) return (ob.items[a] or 0) > (ob.items[c] or 0) end)
+      for _, id in ipairs(extra) do
+        local n = ob.items[id]
+        local iname, ilink, iq, _, ireq = GetItemInfo(id)
+        local it = ITEMS[id]
+        local ok = not it or Usable(id)
+        if ok or not j.usable then
+          ii = ii + 1; any = true; shownItems = shownItems + 1
+          local r = ItemRow(ii, S.list, itemRows)
+          r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y)
+          r.id, r.link, r.chance = id, ilink, nil
+          r.seen = ("New %s - seen dropping in %d of %d kills you looted"):format(where, n, ob.kills)
+          r.icon:SetTexture((GetItemIcon and GetItemIcon(id)) or "Interface\\Icons\\INV_Misc_QuestionMark")
+          r.icon:SetDesaturated(false); r.icon:SetAlpha(1)
+          local c = QCOL[(it and it[4]) or iq or 1] or B.INK
+          r.name:SetText((it and it[6]) or iname or ("item " .. id)); r.name:SetTextColor(c[1], c[2], c[3], 1)
+          local req = (it and it[3]) or ireq or 0
+          local parts = {}
+          if it and Kind(it) ~= "" then parts[#parts + 1] = Kind(it) end
+          if req > 0 then parts[#parts + 1] = (req > lvl) and ("|cffb01010lvl " .. req .. "|r") or ("lvl " .. req) end
+          parts[#parts + 1] = "|cff1a6a1anew  -  seen " .. n .. "/" .. ob.kills .. "|r"
           r.right:SetText(table.concat(parts, "  -  "))
           r:Show()
           y = y + 20
@@ -648,7 +784,7 @@ local function RenderSpoils(d)
       ii = ii + 1
       local r = ItemRow(ii, S.list, itemRows)
       r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y)
-      r.id, r.link, r.chance = nil, nil, nil
+      r.id, r.link, r.chance, r.seen = nil, nil, nil, nil
       r.icon:SetTexture(nil)
       r.name:SetText(#loot > 0 and "Nothing here your class can use" or "No gear of note"); r.name:SetTextColor(B.INK_FAINT[1], B.INK_FAINT[2], B.INK_FAINT[3])
       r.right:SetText("")
@@ -659,7 +795,7 @@ local function RenderSpoils(d)
   end
   for i = bi + 1, #bossRows do bossRows[i]:Hide() end
   for i = ii + 1, #itemRows do itemRows[i]:Hide() end
-  S.sub:SetText(("%d bosses  -  %d pieces of gear%s"):format(#d[9], shownItems, hidden > 0 and ("  (" .. hidden .. " hidden)") or ""))
+  S.sub:SetText(("%d bosses  -  %d pieces of gear%s"):format(#bossList, shownItems, hidden > 0 and ("  (" .. hidden .. " hidden)") or ""))
   S.list:SetHeight(math.max(1, y))
   S.sf:SetVerticalScroll(0); S.sf.Update()
 end

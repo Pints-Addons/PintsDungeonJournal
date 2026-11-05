@@ -4,6 +4,9 @@
 -- Left page: the zone's quests with chains grouped and indented link by link. Right page: the selected quest with
 -- XP (adjusted for your level), money, gear and reputation rewards.
 local ADDON, NS = ...
+-- Compatibility: WoW Forever runs on the modern game client, where these older functions moved or were renamed.
+local GetItemInfo = GetItemInfo or (C_Item and C_Item.GetItemInfo)
+
 local QB = {}
 _G.PintsDungeonJournal = QB
 
