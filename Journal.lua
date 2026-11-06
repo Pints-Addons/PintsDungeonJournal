@@ -325,6 +325,26 @@ local function OnBossDied(name)
   if NS.JournalRefresh then NS.JournalRefresh() end
 end
 
+-- /dj save: write the run you're on (or just finished) into the chronicle, even if the final boss wasn't recorded
+function NS.SaveRun()
+  local j = J(); local run = j and j.cur[CK()]
+  if not run then Say("there's no dungeon run to save."); return end
+  local d = DUN[run.dun]
+  if not d then Say("couldn't tell which dungeon that run was."); return end
+  local rec = run.rec and j.runs[run.rec]
+  if rec and rec.id == run.id then Say("that run of " .. d[2] .. " is already in your Dungeon Journal."); return end
+  local company = {}
+  for name, s in pairs(run.seen or {}) do company[#company + 1] = { name, s[1] or 0, s[2] or "WARRIOR" } end
+  table.sort(company, function(x, y) return x[1] < y[1] end)
+  rec = { id = run.id, ck = CK(), map = run.map, dun = d[2], start = run.start, done = run.last or Now(), finals = {},
+    company = company, bosses = {}, loot = {} }
+  j.runs[#j.runs + 1] = rec
+  run.rec = #j.runs
+  Sync(run)
+  Say(("your run of %s is written into your Dungeon Journal."):format(d[2]))
+  if NS.JournalRefresh then NS.JournalRefresh() end
+end
+
 local LOOT_PATTERNS
 local function LootPatterns()
   LOOT_PATTERNS = {}
@@ -374,7 +394,15 @@ ev:SetScript("OnEvent", function(_, event, a1, ...)
     end
     return
   end
-  if event == "LOOT_OPENED" then OnLootOpened(); return end
+  if event == "LOOT_OPENED" then
+    -- looting a dead boss also counts as its kill (for bosses the game doesn't report as an encounter)
+    if NO_COMBAT_LOG and UnitExists("target") then
+      local dead, name = UnitIsDead("target"), UnitName("target")
+      if type(issecretvalue) == "function" and (issecretvalue(dead) or issecretvalue(name)) then dead = nil end
+      if dead and name then OnBossDied(name) end
+    end
+    OnLootOpened(); return
+  end
   if event == "ENCOUNTER_END" then
     -- a boss encounter was won: remember its name for this instance so its corpse's loot is logged
     local encName, _, _, success = ...          -- a1 is the encounter ID
@@ -382,6 +410,8 @@ ev:SetScript("OnEvent", function(_, event, a1, ...)
       local instName, _, _, _, _, _, _, mapID = GetInstanceInfo()
       local m = mapID and Drops(mapID)
       if m then m.name = m.name or instName; m.enc = m.enc or {}; m.enc[encName] = true end
+      -- WoW Forever: the add-on can't see the combat log there, so this is how it knows a boss died
+      if NO_COMBAT_LOG then OnBossDied(encName) end
     end
     return
   end

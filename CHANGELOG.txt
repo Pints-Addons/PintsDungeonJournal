@@ -1,5 +1,12 @@
 Pint's Dungeon Journal - Changelog
 
+v1.1.4
+- WoW Forever: runs are written into the chronicle again - boss kills now come from the game's encounter messages (and
+  from looting a dead boss), since add-ons can't read the combat log there.
+- /dj save writes the run you're on (or just finished) into the chronicle, even if its final boss wasn't recorded.
+- WoW Forever: the City of Dalaran dungeon (Alterac Mountains, levels 28-35) is in the journal - its eight bosses
+  (including the secret Lyn the Ignored) and their loot, from the Forever beta.
+
 v1.1.3
 - WoW Forever: the Ruins of Lordaeron dungeon (Tirisfal Glades, levels 15-22) is in the journal - its six bosses and
   their loot, from the Forever beta. Bosses and drops may still change.

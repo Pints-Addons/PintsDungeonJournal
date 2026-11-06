@@ -2,7 +2,7 @@
 ## Title: |cffd4a017Pint's|r Dungeon Journal
 ## Notes: Every Classic dungeon and raid in a leather-bound book with your name on the cover - lore, bosses and their loot, and a chronicle of every run you finish with date, company and loot. /dj
 ## Author: Jake (Pint's Add-ons, built with Claude)
-## Version: 1.1.3
+## Version: 1.1.4
 ## X-Curse-Project-ID: 1779411
 ## X-License: GPL-3.0
 ## IconTexture: Interface\AddOns\PintsDungeonJournal\Icon

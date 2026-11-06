@@ -2259,7 +2259,11 @@ end
 SLASH_PINTSDJOURNAL1 = "/dj"
 SLASH_PINTSDJOURNAL2 = "/journal"
 SLASH_PINTSDJOURNAL3 = "/pdj"
-SlashCmdList.PINTSDJOURNAL = function() QB.OpenBook("journal") end
+SlashCmdList.PINTSDJOURNAL = function(msg)
+  msg = (msg or ""):lower()
+  if msg == "save" or msg == "saverun" then if NS.SaveRun then NS.SaveRun() end; return end
+  QB.OpenBook("journal")
+end
 
 -- shared with Tracker.lua / Auto.lua
 NS.Data = function() return D end
