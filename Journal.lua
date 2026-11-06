@@ -193,8 +193,9 @@ local function Now() return time() end
 local function DungeonHere()
   local inInst, kind = IsInInstance()
   if not inInst or (kind ~= "party" and kind ~= "raid") then return end
-  local mapID = select(8, GetInstanceInfo())
-  return mapID and BYMAP[mapID], mapID
+  local instName, _, _, _, _, _, _, mapID = GetInstanceInfo()
+  -- (dungeons new in WoW Forever are found by name until their map number is known)
+  return mapID and (BYMAP[mapID] or (instName and BYNAME[instName])), mapID
 end
 local function Cur() local j = J(); return j and j.cur[CK()] end
 local function EndRun(why)

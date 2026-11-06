@@ -1,5 +1,9 @@
 Pint's Dungeon Journal - Changelog
 
+v1.1.3
+- WoW Forever: the Ruins of Lordaeron dungeon (Tirisfal Glades, levels 15-22) is in the journal - its six bosses and
+  their loot, from the Forever beta. Bosses and drops may still change.
+
 v1.1.2
 - WoW Forever: no more errors when the game hides a chat message from add-ons.
 
