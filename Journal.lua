@@ -37,6 +37,7 @@ local ALIAS = {
   ["Highlord Mograine"] = "The Four Horsemen", ["Thane Korth'azz"] = "The Four Horsemen",
   ["Lady Blaumeux"] = "The Four Horsemen", ["Sir Zeliek"] = "The Four Horsemen",
   ["Doom'rel"] = "The Seven",
+  ["The Baron"] = "The Butcher",      -- Ruins of Lordaeron (WoW Forever): the beta guides' name for him
 }
 
 ---------------------------------------------------------------- saved state
@@ -276,7 +277,9 @@ end
 local function OnBossDied(name)
   local run = Cur(); if not run then return end
   name = ALIAS[name] or name
-  local idx = BOSSDUN[run.map] and BOSSDUN[run.map][name]
+  -- (a dungeon found by its name has the journal's own number, not the game's map number)
+  local bossMap = BOSSDUN[run.map] or (DUN[run.dun] and BOSSDUN[DUN[run.dun][1]])
+  local idx = bossMap and bossMap[name]
   if not idx then return end
   if idx ~= run.dun then
     if #run.bosses == 0 then
@@ -548,6 +551,9 @@ local function BuildPages()
   C.sf, C.list = sf2, list2
   C.empty = C:CreateFontString(nil, "OVERLAY", B.F_BODY); C.empty:SetPoint("TOPLEFT", 28, -96); C.empty:SetWidth(B.PAGE_W - 60)
   C.empty:SetJustifyH("LEFT"); C.empty:SetSpacing(3); Ink(C.empty, B.INK_SOFT)
+  -- the overall tally (the runs themselves are listed on the right page)
+  sf2:Hide()
+  C.heads, C.texts = {}, {}
 
   -- right page, spread 2: one run in full
   local Dt = CreateFrame("Frame", nil, R); Dt:SetAllPoints(); R.detail = Dt
@@ -562,6 +568,15 @@ local function BuildPages()
   Dt.empty:SetJustifyH("LEFT"); Dt.empty:SetSpacing(3); Ink(Dt.empty, B.INK_SOFT)
   -- headings and text lines inside the run's scroll list
   Dt.heads, Dt.texts = {}, {}
+  -- reading one run: back to the list of runs
+  Dt.back = CreateFrame("Button", nil, Dt); Dt.back:SetSize(90, 18); Dt.back:SetPoint("TOPRIGHT", -24, -24)
+  Dt.back.t = Dt.back:CreateFontString(nil, "OVERLAY", B.F_SMALL); Dt.back.t:SetPoint("RIGHT"); Dt.back.t:SetText("< All runs"); Ink(Dt.back.t, B.RUBRIC)
+  Dt.back:SetScript("OnEnter", function(self) self.t:SetAlpha(0.7) end); Dt.back:SetScript("OnLeave", function(self) self.t:SetAlpha(1) end)
+  Dt.back:SetScript("OnClick", function()
+    selRun = nil
+    if SOUNDKIT and SOUNDKIT.IG_ABILITY_PAGE_TURN then PlaySound(SOUNDKIT.IG_ABILITY_PAGE_TURN) end
+    NS.RenderJournal()
+  end)
 end
 
 ---------------------------------------------------------------- row factories
@@ -595,7 +610,7 @@ end
 local function RunRow(i)
   local r = runRows[i]; if r then return r end
   local B = NS.Book
-  r = CreateFrame("Button", nil, L.chron.list); r:SetSize(B.PAGE_W - 52, 38)
+  r = CreateFrame("Button", nil, R.detail.list); r:SetSize(B.PAGE_W - 76, 38)
   local hl = r:CreateTexture(nil, "HIGHLIGHT"); hl:SetAllPoints(); hl:SetColorTexture(0.45, 0.30, 0.10, 0.12)
   r.sel = r:CreateTexture(nil, "BORDER"); r.sel:SetAllPoints(); r.sel:SetColorTexture(0.55, 0.35, 0.10, 0.18)
   r.when = r:CreateFontString(nil, "OVERLAY", B.F_ROW); r.when:SetPoint("TOPLEFT", 6, -3); Ink(r.when, B.INK)
@@ -840,6 +855,89 @@ local function RenderChronicle(d)
   C.all.Sync()
   local runs = ShownRuns(d)
   C.sub:SetText(#runs == 0 and "No runs recorded yet" or (#runs .. " run" .. (#runs == 1 and "" or "s") .. " to the final boss"))
+  for _, f in ipairs(C.heads) do f:Hide() end
+  for _, f in ipairs(C.texts) do f:Hide() end
+  C.empty:SetShown(#runs == 0)
+  C.empty:SetText("When the final boss of " .. d[2] .. " falls with you there, the run is written into this chronicle: the date and " ..
+    "time, who stood with you (name, level and class), the bosses that fell and any gear you looted. A tally of them all appears here.")
+  if #runs == 0 then return runs end
+  local y, hi, ti = 96, 0, 0
+  local function Head(text)
+    hi = hi + 1; local f = C.heads[hi]
+    if not f then f = C:CreateFontString(nil, "OVERLAY", B.F_HEAD); Ink(f, B.RUBRIC); C.heads[hi] = f end
+    f:ClearAllPoints(); f:SetPoint("TOPLEFT", 24, -y); f:SetText(text); f:Show(); y = y + 24
+  end
+  local function Text(text)
+    ti = ti + 1; local f = C.texts[ti]
+    if not f then f = C:CreateFontString(nil, "OVERLAY", B.F_BODY); f:SetWidth(B.PAGE_W - 60); f:SetJustifyH("LEFT"); f:SetSpacing(3); Ink(f, B.INK); C.texts[ti] = f end
+    f:ClearAllPoints(); f:SetPoint("TOPLEFT", 28, -y); f:SetText(text); f:Show(); y = y + math.max(16, f:GetStringHeight() or 16) + 8
+  end
+  -- times
+  local fastest, total, timed, first, last = nil, 0, 0, nil, nil
+  local bossN, lootN, best, mates = {}, 0, {}, {}
+  local me = (GetUnitName and GetUnitName("player", false)) or UnitName("player") or "?"
+  local meDash = (me:gsub(" ", "-"))   -- (the company list writes "Rain Mon" as "Rain-Mon")
+  for _, rec in ipairs(runs) do
+    if rec.start and rec.done and rec.done > rec.start then
+      local t = rec.done - rec.start; timed = timed + 1; total = total + t
+      if not fastest or t < fastest[1] then fastest = { t, rec } end
+    end
+    local t = rec.done or rec.start
+    if t then first = math.min(first or t, t); last = math.max(last or t, t) end
+    for _, b in ipairs(rec.bosses or {}) do bossN[b] = (bossN[b] or 0) + 1 end
+    for _, link in ipairs(rec.loot or {}) do
+      lootN = lootN + 1
+      local hex = link:match("|cff(%x%x%x%x%x%x)") or ""
+      local q = LINKQ[hex:lower()] or 0
+      if q >= 3 then best[#best + 1] = { q, (link:match("|h%[(.-)%]|h") or "item") } end
+    end
+    for _, m in ipairs(rec.company or {}) do
+      local n = m[1]
+      if n and n ~= me and n ~= meDash and n:gsub("%-.*$", "") ~= me then mates[n] = (mates[n] or 0) + 1 end
+    end
+  end
+  Head("Your runs")
+  local lines = { ("%d run%s to the final boss"):format(#runs, #runs == 1 and "" or "s") }
+  if first then lines[#lines + 1] = (first == last) and ("on " .. When(first, "%B %d, %Y")) or ("from " .. When(first, "%B %d, %Y") .. " to " .. When(last, "%B %d, %Y")) end
+  Text(table.concat(lines, ", "))
+  if timed > 0 then
+    Head("Time")
+    Text(("Fastest %s (%s)%s"):format(Dur(0, fastest[1]), When(fastest[2].done or fastest[2].start, "%b %d"),
+      timed > 1 and ("  -  average " .. Dur(0, total / timed)) or ""))
+  end
+  Head("Bosses slain")
+  local bl = {}
+  for _, b in ipairs(d[9]) do if bossN[b[1]] then bl[#bl + 1] = b[1] .. " x" .. bossN[b[1]] end end
+  for b, n in pairs(bossN) do local listed = false; for _, x in ipairs(d[9]) do if x[1] == b then listed = true end end; if not listed then bl[#bl + 1] = b .. " x" .. n end end
+  Text(#bl > 0 and table.concat(bl, ", ") or "None recorded yet.")
+  Head("Spoils")
+  table.sort(best, function(a, b) if a[1] ~= b[1] then return a[1] > b[1] end return a[2] < b[2] end)
+  local bn = {}
+  for i = 1, math.min(6, #best) do local c = QCOL[best[i][1]] or B.INK; bn[#bn + 1] = ("|cff%02x%02x%02x%s|r"):format(c[1] * 255, c[2] * 255, c[3] * 255, best[i][2]) end
+  Text(("%d item%s looted"):format(lootN, lootN == 1 and "" or "s") .. (#bn > 0 and (", the best of them: " .. table.concat(bn, ", ")) or ""))
+  local ml = {}
+  for n, c in pairs(mates) do ml[#ml + 1] = { n, c } end
+  if #ml > 0 then
+    table.sort(ml, function(a, b) if a[2] ~= b[2] then return a[2] > b[2] end return a[1] < b[1] end)
+    Head("Companions")
+    local t = {}
+    for i = 1, math.min(5, #ml) do t[#t + 1] = ml[i][1] .. (ml[i][2] > 1 and (" (" .. ml[i][2] .. " runs)") or "") end
+    Text(table.concat(t, ", "))
+  end
+  return runs
+end
+
+-- the right page with no run chosen: every run, newest first; click one to read it
+local function RenderRunList(d, runs)
+  local B = NS.Book
+  local Dt = R.detail
+  for _, f in ipairs(Dt.heads) do f:Hide() end
+  for _, f in ipairs(Dt.texts) do f:Hide() end
+  for _, r in ipairs(mateRows) do r:Hide() end
+  for _, r in ipairs(lootRows) do r:Hide() end
+  Dt.back:Hide()
+  Dt.title:SetText("The runs")
+  Dt.sub:SetText(#runs > 0 and "Click a run to read it in full" or "")
   local y = 0
   for i, rec in ipairs(runs) do
     local r = RunRow(i)
@@ -852,24 +950,22 @@ local function RenderChronicle(d)
     r.info:SetText(("%s%d in the company  -  %d boss%s  -  %d spoil%s%s"):format(who, #(rec.company or {}),
       #(rec.bosses or {}), #(rec.bosses or {}) == 1 and "" or "es", nl, nl == 1 and "" or "s",
       (rec.start and rec.done) and ("  -  " .. Dur(rec.start, rec.done)) or ""))
-    r.sel:SetShown(selRun == rec)
+    r.sel:Hide()
     r:Show()
     y = y + 40
   end
   for i = #runs + 1, #runRows do runRows[i]:Hide() end
-  C.list:SetHeight(math.max(1, y))
-  C.sf.Update()
-  C.empty:SetShown(#runs == 0)
-  C.empty:SetText("When the final boss of " .. d[2] .. " falls with you there, the run is written here: the date and time, " ..
-    "who stood with you (name, level and class) and any gear you looted.")
-  if not selRun and runs[1] then selRun = runs[1] end
-  return runs
+  Dt.empty:SetShown(#runs == 0); Dt.empty:SetText("No runs yet.")
+  Dt.list:SetHeight(math.max(1, y))
+  Dt.sf:SetVerticalScroll(0); Dt.sf.Update()
 end
 
 local function RenderRun(d)
   local B = NS.Book
   local Dt = R.detail
   local rec = selRun
+  for _, r in ipairs(runRows) do r:Hide() end
+  Dt.back:Show()
   for _, f in ipairs(Dt.heads) do f:Hide() end
   for _, f in ipairs(Dt.texts) do f:Hide() end
   if not rec then
@@ -983,8 +1079,8 @@ function NS.RenderJournal()
     local runs = RenderChronicle(d)
     local found = false
     for _, r in ipairs(runs) do if r == selRun then found = true end end
-    if not found then selRun = runs[1] end
-    RenderRun(d)
+    if not found then selRun = nil end
+    if selRun then RenderRun(d) else RenderRunList(d, runs) end
   else
     RenderTale(d)
     RenderSpoils(d)

@@ -1,5 +1,12 @@
 Pint's Dungeon Journal - Changelog
 
+v1.1.5
+- WoW Forever: Ruins of Lordaeron runs are written into the chronicle - the journal now knows the dungeon by the game's
+  own map number, and its second boss by his in-game name, The Butcher.
+- The Chronicle of Runs has a new layout: the left page is your tally for the dungeon (runs, fastest and average time,
+  bosses slain, best spoils, the companions you've run with most), the right page lists every run, and clicking one
+  opens it in full (company, bosses, spoils, time) with "< All runs" to go back.
+
 v1.1.4
 - WoW Forever: runs are written into the chronicle again - boss kills now come from the game's encounter messages (and
   from looting a dead boss), since add-ons can't read the combat log there.

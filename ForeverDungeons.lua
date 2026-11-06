@@ -1,16 +1,16 @@
 -- Pint's Dungeon Journal: dungeons new in WoW Forever, from what was published about the Forever beta (boss loot by item id;
 -- bosses and drops may still change). Added to the journal like the original dungeons.
--- (The game's map number for these isn't known yet, so they're found by the dungeon's name when you're inside.)
+-- (Where the game's map number isn't known yet - a negative number here - the dungeon is found by its name when you're inside.)
 local JD = PintsJournalData
 if not JD then return end
 local function Add(d) JD.dungeons[#JD.dungeons + 1] = d end
 local function Item(id, inv, cls, req, q, name) if not JD.items[id] then JD.items[id] = { inv, cls, req, q, 0, name } end end
 
-Add({ -1001, "Ruins of Lordaeron", "Tirisfal Glades", 15, 22, 0, { "Rath'mael" },
+Add({ 2999, "Ruins of Lordaeron", "Tirisfal Glades", 15, 22, 0, { "Rath'mael" },
 	"Above the Undercity lie the shattered streets of Lordaeron's old capital. Spiders, ghouls, abominations and restless spirits now walk its alleys and market square, and somewhere among the graves the lich Rath'mael gathers the dead.",
 	{
 		{ "Witherfang", 17, { 271201, 33, 271202, 33, 271203, 33 } },
-		{ "The Baron", 17, { 271204, 33, 271205, 33, 271206, 33 } },
+		{ "The Butcher", 17, { 271204, 33, 271205, 33, 271206, 33 } },
 		{ "Viktor the Vile", "?", { 271211, 33, 271212, 33, 271218, 33 } },
 		{ "The Abandoned", "?", { 271207, 33, 271208, 33, 271216, 33 } },
 		{ "Bjork", "?", { 271209, 33, 271210, 33, 271217, 33 } },
