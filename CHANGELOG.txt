@@ -6,6 +6,7 @@ v1.1.5
 - The Chronicle of Runs has a new layout: the left page is your tally for the dungeon (runs, fastest and average time,
   bosses slain, best spoils, the companions you've run with most), the right page lists every run, and clicking one
   opens it in full (company, bosses, spoils, time) with "< All runs" to go back.
+- Ruins of Lordaeron and City of Dalaran sit among the other dungeons by level in the menu and in Prev / Next dungeon.
 
 v1.1.4
 - WoW Forever: runs are written into the chronicle again - boss kills now come from the game's encounter messages (and

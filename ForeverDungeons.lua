@@ -3,7 +3,15 @@
 -- (Where the game's map number isn't known yet - a negative number here - the dungeon is found by its name when you're inside.)
 local JD = PintsJournalData
 if not JD then return end
-local function Add(d) JD.dungeons[#JD.dungeons + 1] = d end
+-- each one goes in among the original dungeons by level, so the menu and Prev / Next dungeon keep their order
+local function Add(d)
+	local list = JD.dungeons
+	for i, x in ipairs(list) do
+		if x[6] == d[6] and x[4] > d[4] then table.insert(list, i, d); return end
+		if x[6] > d[6] then table.insert(list, i, d); return end
+	end
+	list[#list + 1] = d
+end
 local function Item(id, inv, cls, req, q, name) if not JD.items[id] then JD.items[id] = { inv, cls, req, q, 0, name } end end
 
 Add({ 2999, "Ruins of Lordaeron", "Tirisfal Glades", 15, 22, 0, { "Rath'mael" },

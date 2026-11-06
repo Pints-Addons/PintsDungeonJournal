@@ -62,6 +62,14 @@ local function J()
     end
     j.wingsSplit = true
   end
+  -- the list of dungeons can change order between versions (new ones go in by level): keep runs in progress pointing at theirs
+  if not NS.djOrderChecked then
+    NS.djOrderChecked = true      -- (once per session)
+    for _, run in pairs(j.cur) do
+      local d = DUN[run.dun or 0]
+      if (not d or d[1] ~= run.map) and BYMAP[run.map] then run.dun = BYMAP[run.map] end
+    end
+  end
   return j
 end
 local function Kills()
