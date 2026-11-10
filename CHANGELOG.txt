@@ -1,5 +1,17 @@
 Pint's Dungeon Journal - Changelog
 
+v1.1.6
+- WoW Forever: every new dungeon is in the journal now - Hall of Thanes (13-18), Excavation Site: Wetlands (26-33),
+  The Drowned City (35-40), Krol'dok Stronghold (40-45), Alcaz Prison (48-53), Blackmaw Hold (55-60) and Shaper's
+  Terrace (58-60) - each with where to find it, its story, its bosses and their loot as far as it has been published.
+  Loot shows "?%" where the drop chance isn't known yet; items whose numbers aren't published yet show by name.
+  Bosses, loot and level ranges may still change.
+- Runs in these dungeons go into the chronicle (the journal recognises them by name inside, even when the game's name
+  is a little different, e.g. "Excavation Site").
+- Map: a new button on the book's bar shows the game's own map of the dungeon on the left page (every floor, with a
+  button for each), with its bosses and spoils still on the right - and an arrow for you when you're inside.
+  Dungeons the game has no map for yet say so (some of WoW Forever's new ones).
+
 v1.1.5
 - WoW Forever: Ruins of Lordaeron runs are written into the chronicle - the journal now knows the dungeon by the game's
   own map number, and its second boss by his in-game name, The Butcher.

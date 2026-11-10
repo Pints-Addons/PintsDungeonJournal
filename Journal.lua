@@ -204,7 +204,18 @@ local function DungeonHere()
   if not inInst or (kind ~= "party" and kind ~= "raid") then return end
   local instName, _, _, _, _, _, _, mapID = GetInstanceInfo()
   -- (dungeons new in WoW Forever are found by name until their map number is known)
-  return mapID and (BYMAP[mapID] or (instName and BYNAME[instName])), mapID
+  local i = mapID and (BYMAP[mapID] or (instName and BYNAME[instName]))
+  -- (the game's name can be a little different from the journal's: "Excavation Site" for "Excavation Site: Wetlands")
+  if mapID and not i and type(instName) == "string" and not (type(issecretvalue) == "function" and issecretvalue(instName)) then
+    local a = instName:lower():gsub("[^%w]", "")
+    if #a >= 6 then
+      for n, idx in pairs(BYNAME) do
+        local b = n:lower():gsub("[^%w]", "")
+        if b:find(a, 1, true) == 1 or a:find(b, 1, true) == 1 then i = idx; break end
+      end
+    end
+  end
+  return i, mapID
 end
 local function Cur() local j = J(); return j and j.cur[CK()] end
 local function EndRun(why)
@@ -479,7 +490,7 @@ function NS.JournalTurn(dir)
   Turn(dir)
 end
 function NS.JournalFrac() return (jIdx or 1) / math.max(1, #DUN) end
-function NS.JournalSpread() return 900 + (jIdx or 1) * 2 + (jPage or 1) end
+function NS.JournalSpread() return 900 + (jIdx or 1) * 3 + (jPage or 1) end
 function NS.JournalReset() jIdx, jPage, selRun = nil, 1, nil end
 
 local function Check(parent, label, get, set, tip)
@@ -499,8 +510,14 @@ end
 local function ItemTip(self)
   if not self.link and not self.id then return end
   GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-  if self.link then GameTooltip:SetHyperlink(self.link:gsub("x%d+$", "")) else GameTooltip:SetHyperlink("item:" .. self.id) end
-  if self.chance then GameTooltip:AddLine(("Drop chance: about %d%%"):format(self.chance), 0.8, 0.8, 0.8) end
+  if self.link then GameTooltip:SetHyperlink(self.link:gsub("x%d+$", ""))
+  elseif self.id < 0 then
+    -- (a WoW Forever item whose number isn't published yet: just its name)
+    local it = ITEMS[self.id]
+    GameTooltip:AddLine(it and it[6] or "?", 0, 0.44, 0.87)
+    GameTooltip:AddLine("New in WoW Forever - the full tooltip shows once the item's number is known.", 0.6, 0.6, 0.6, true)
+  else GameTooltip:SetHyperlink("item:" .. self.id) end
+  if self.chance and self.chance > 0 then GameTooltip:AddLine(("Drop chance: about %d%%"):format(self.chance), 0.8, 0.8, 0.8) end
   if self.seen then GameTooltip:AddLine(self.seen, 0.4, 0.9, 0.4) end
   GameTooltip:Show()
 end
@@ -510,6 +527,58 @@ local function ItemClick(self)
   if IsModifiedClick("CHATLINK") and ChatEdit_InsertLink then ChatEdit_InsertLink(link)
   elseif IsModifiedClick("DRESSUP") and DressUpItemLink then DressUpItemLink(link) end
 end
+
+---------------------------------------------------------------- dungeon maps
+-- The game's own maps of each dungeon (all its floors). Found once by asking the game about every map it has: a map
+-- of the "dungeon" kind whose spot in the world is in this dungeon's instance (or, for WoW Forever's new dungeons,
+-- whose name matches).
+local dunMaps
+local function Norm(s) return (s or ""):lower():gsub("[^%w]", "") end
+local function FindMaps()
+  dunMaps = { byInst = {}, byName = {} }
+  if not (C_Map and C_Map.GetMapInfo) then return end
+  local DUNGEON = (Enum and Enum.UIMapType and Enum.UIMapType.Dungeon) or 4
+  local MICRO = (Enum and Enum.UIMapType and Enum.UIMapType.Micro) or 5
+  local v = CreateVector2D and CreateVector2D(0.5, 0.5)
+  for id = 1, 5000 do        -- (WoW Forever's newest maps have big numbers)
+    local ok, info = pcall(C_Map.GetMapInfo, id)
+    if ok and info and (info.mapType == DUNGEON or info.mapType == MICRO) and C_Map.GetMapArtLayers then
+      local okL, layers = pcall(C_Map.GetMapArtLayers, id)
+      if okL and layers and layers[1] then
+        local inst
+        if v and C_Map.GetWorldPosFromMapPos then
+          local okW, i = pcall(C_Map.GetWorldPosFromMapPos, id, v)
+          if okW and type(i) == "number" then inst = i end
+        end
+        local floorName
+        if C_Map.GetMapGroupID and C_Map.GetMapGroupMembersInfo then
+          local g = C_Map.GetMapGroupID(id)
+          if g then for _, m in ipairs(C_Map.GetMapGroupMembersInfo(g) or {}) do if m.mapID == id then floorName = m.name end end end
+        end
+        local e = { id = id, name = info.name, floor = floorName or info.name }
+        if inst then dunMaps.byInst[inst] = dunMaps.byInst[inst] or {}; table.insert(dunMaps.byInst[inst], e) end
+        local n = Norm(info.name)
+        dunMaps.byName[n] = dunMaps.byName[n] or {}; table.insert(dunMaps.byName[n], e)
+      end
+    end
+  end
+end
+local function MapsFor(d)
+  if not dunMaps then FindMaps() end
+  local list = (d[1] and d[1] > 0) and dunMaps.byInst[d[1]] or nil
+  if not list then
+    local n = Norm(d[2])
+    list = dunMaps.byName[n]
+    if not list then   -- ("The Drowned City" / "Drowned City", "Excavation Site: Wetlands" / "Excavation Site")
+      for k, l in pairs(dunMaps.byName) do
+        if #k >= 6 and (k:find(n, 1, true) or n:find(k, 1, true)) then list = l; break end
+      end
+    end
+  end
+  if list then table.sort(list, function(a, b) return a.id < b.id end) end
+  return list or {}
+end
+local mapFloor = {}       -- dungeon index -> floor picked
 
 local function BuildPages()
   local win = NS.Win(); local B = NS.Book
@@ -562,6 +631,21 @@ local function BuildPages()
   -- the overall tally (the runs themselves are listed on the right page)
   sf2:Hide()
   C.heads, C.texts = {}, {}
+
+  -- left page, the map: the game's own map of the dungeon, floor by floor
+  local M = CreateFrame("Frame", nil, L); M:SetAllPoints(); L.map = M
+  M.chapter = M:CreateFontString(nil, "OVERLAY", B.F_CHAPTER); M.chapter:SetPoint("TOP", 0, -10); Ink(M.chapter, B.RUBRIC)
+  M.title = M:CreateFontString(nil, "OVERLAY", B.F_TITLE); M.title:SetPoint("TOPLEFT", 24, -22); M.title:SetText("Map")
+  M.sub = M:CreateFontString(nil, "OVERLAY", B.F_SMALL); M.sub:SetPoint("TOPLEFT", M.title, "BOTTOMLEFT", 2, -2); Ink(M.sub, B.INK_SOFT)
+  M.floors = {}
+  -- the picture: tiles inside a frame that clips them to the map's own size
+  M.clip = CreateFrame("Frame", nil, M); M.clip:SetClipsChildren(true)
+  M.edge = M:CreateTexture(nil, "BORDER"); M.edge:SetColorTexture(B.INK_FAINT[1], B.INK_FAINT[2], B.INK_FAINT[3], 0.6)
+  M.edge:SetPoint("TOPLEFT", M.clip, "TOPLEFT", -2, 2); M.edge:SetPoint("BOTTOMRIGHT", M.clip, "BOTTOMRIGHT", 2, -2)
+  M.tiles = {}
+  M.empty = M:CreateFontString(nil, "OVERLAY", B.F_BODY); M.empty:SetPoint("TOPLEFT", 28, -110); M.empty:SetWidth(B.PAGE_W - 60)
+  M.empty:SetJustifyH("LEFT"); M.empty:SetSpacing(3); Ink(M.empty, B.INK_SOFT)
+  M.you = M.clip:CreateTexture(nil, "OVERLAY"); M.you:SetSize(18, 18); M.you:SetTexture("Interface\\Minimap\\MinimapArrow"); M.you:Hide()
 
   -- right page, spread 2: one run in full
   local Dt = CreateFrame("Frame", nil, R); Dt:SetAllPoints(); R.detail = Dt
@@ -787,7 +871,7 @@ local function RenderSpoils(d)
           local parts = {}
           if kind ~= "" then parts[#parts + 1] = kind end
           if reqTxt ~= "" then parts[#parts + 1] = reqTxt end
-          parts[#parts + 1] = ch .. "%"
+          parts[#parts + 1] = (ch and ch > 0) and (ch .. "%") or "?%"     -- (WoW Forever's new dungeons: not known yet)
           if ob and ob.kills > 0 then
             local n = ob.items[id] or 0
             parts[#parts + 1] = (n > 0 and "|cff1a6a1a" or "|cff8a7050") .. "seen " .. n .. "/" .. ob.kills .. "|r"
@@ -1044,6 +1128,75 @@ local function RenderRun(d)
   Dt.sf:SetVerticalScroll(0); Dt.sf.Update()
 end
 
+local function RenderMap(d)
+  local M, B = L.map, NS.Book
+  M.chapter:SetText("~ " .. d[2] .. " ~")
+  local list = MapsFor(d)
+  for _, t in ipairs(M.tiles) do t:Hide() end
+  for _, f in ipairs(M.floors) do f:Hide() end
+  M.you:Hide()
+  if #list == 0 then
+    M.sub:SetText(d[3] .. "  -  levels " .. d[4] .. "-" .. d[5])
+    M.clip:Hide(); M.edge:Hide()
+    M.empty:SetText("The game has no map of this dungeon" .. ((d[1] or 0) < 0 and " yet (new in WoW Forever - it appears here once the game has one)." or "."))
+    M.empty:Show()
+    return
+  end
+  M.empty:Hide()
+  local fi = math.min(mapFloor[jIdx] or 1, #list)
+  local e = list[fi]
+  M.sub:SetText(#list > 1 and ("Floor %d of %d: %s"):format(fi, #list, e.floor or "") or (e.floor or d[2]))
+  -- floor buttons (when there's more than one)
+  local x = 24
+  for i, f in ipairs(list) do
+    local b = M.floors[i]
+    if not b then
+      b = CreateFrame("Button", nil, M); b:SetHeight(18)
+      b.t = b:CreateFontString(nil, "OVERLAY", B.F_SMALL); b.t:SetPoint("LEFT")
+      b:SetScript("OnClick", function(self) mapFloor[jIdx] = self.i; NS.RenderJournal() end)
+      b:SetScript("OnEnter", function(self) self.t:SetAlpha(0.7) end); b:SetScript("OnLeave", function(self) self.t:SetAlpha(1) end)
+      M.floors[i] = b
+    end
+    b.i = i
+    b.t:SetText((i == fi and "|cff8a1010" or "|cff5a4020") .. (f.floor or ("Floor " .. i)) .. "|r")
+    b:SetWidth(b.t:GetStringWidth() + 10)
+    if #list > 1 then b:ClearAllPoints(); b:SetPoint("TOPLEFT", M, "TOPLEFT", x, -76); b:Show(); x = x + b:GetWidth() + 4 end
+  end
+  -- the picture, as big as fits on the page
+  local layers = C_Map.GetMapArtLayers(e.id)
+  local ly = layers and layers[1]
+  local okT, tex = pcall(C_Map.GetMapArtLayerTextures, e.id, 1)
+  if not (ly and okT and tex) then M.clip:Hide(); M.edge:Hide(); M.empty:SetText("The game wouldn't draw this map."); M.empty:Show(); return end
+  local top = (#list > 1) and 100 or 80
+  local maxW, maxH = B.PAGE_W - 48, B.PAGE_H - top - 30
+  local s = math.min(maxW / ly.layerWidth, maxH / ly.layerHeight)
+  local w, h = ly.layerWidth * s, ly.layerHeight * s
+  M.clip:ClearAllPoints(); M.clip:SetPoint("TOP", M, "TOP", 0, -top); M.clip:SetSize(w, h); M.clip:Show(); M.edge:Show()
+  local cols = math.ceil(ly.layerWidth / ly.tileWidth)
+  local tw, th = ly.tileWidth * s, ly.tileHeight * s
+  for i, file in ipairs(tex) do
+    local t = M.tiles[i]
+    if not t then t = M.clip:CreateTexture(nil, "ARTWORK"); M.tiles[i] = t end
+    local r, c = math.floor((i - 1) / cols), (i - 1) % cols
+    t:SetTexture(file); t:SetSize(tw, th); t:ClearAllPoints(); t:SetPoint("TOPLEFT", M.clip, "TOPLEFT", c * tw, -r * th); t:Show()
+  end
+  -- you, when you're on this floor
+  if C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player") == e.id and C_Map.GetPlayerMapPosition then
+    local okP, pos = pcall(C_Map.GetPlayerMapPosition, e.id, "player")
+    if okP and pos then
+      local px, py = pos:GetXY()
+      if type(px) == "number" and not (type(issecretvalue) == "function" and issecretvalue(px)) then
+        M.you:ClearAllPoints(); M.you:SetPoint("CENTER", M.clip, "TOPLEFT", px * w, -py * h); M.you:Show()
+      end
+    end
+  end
+end
+-- the Map button: the dungeon's map on the left page, its bosses and spoils still on the right
+function NS.JournalMap()
+  if jPage == 3 then jPage = 1 else jPage = 3 end
+  selRun = nil; Turn(1)
+end
+
 -- the book's bottom bar: pick a dungeon, and flip between the lore and the chronicle of runs
 function NS.JournalPick(owner)
   local items = { { text = "Dungeons", header = true } }
@@ -1077,9 +1230,12 @@ function NS.RenderJournal()
   local d = DUN[jIdx]
   local w = NS.Win()
   local two = (jPage == 2)
+  local three = (jPage == 3)
   if w and w.jFlip then w.jFlip:SetText(two and "Lore & spoils" or "Chronicle of runs") end
-  L.tale:SetShown(not two); R.spoils:SetShown(not two)
+  if w and w.jMap then w.jMap:SetText(three and "Lore" or "Map") end
+  L.tale:SetShown(not two and not three); R.spoils:SetShown(not two)
   L.chron:SetShown(two); R.detail:SetShown(two)
+  L.map:SetShown(three)
   if w and w.pageL then
     w.pageL:SetText("~ " .. (jIdx * 4 - (two and 1 or 3)) .. " ~"); w.pageR:SetText("~ " .. (jIdx * 4 - (two and 0 or 2)) .. " ~")
   end
@@ -1089,6 +1245,9 @@ function NS.RenderJournal()
     for _, r in ipairs(runs) do if r == selRun then found = true end end
     if not found then selRun = nil end
     if selRun then RenderRun(d) else RenderRunList(d, runs) end
+  elseif three then
+    RenderMap(d)
+    RenderSpoils(d)
   else
     RenderTale(d)
     RenderSpoils(d)

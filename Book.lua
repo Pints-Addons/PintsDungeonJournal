@@ -1689,11 +1689,14 @@ local function CreateWindow()
   local jShut = StoryButton(win, "Close book", 96)
   local jPick = StoryButton(win, "Choose a dungeon", 150)
   local jFlip = StoryButton(win, "Chronicle of runs", 150)
+  local jMap = StoryButton(win, "Map", 80)
+  jMap:SetScript("OnClick", function() if NS.JournalMap then NS.JournalMap() end end)
+  win.jMap = jMap
   jShut:SetScript("OnClick", function() if win.CloseCover then win.CloseCover() end end)
   jPick:SetScript("OnClick", function(self) if NS.JournalPick then NS.JournalPick(self) end end)
   jFlip:SetScript("OnClick", function() if NS.JournalFlip then NS.JournalFlip() end end)
   win.jFlip = jFlip
-  win.questBar, win.journalBar = { shut, toc, mine, deedsB, raresB, opt }, { jShut, jPick, jFlip }
+  win.questBar, win.journalBar = { shut, toc, mine, deedsB, raresB, opt }, { jShut, jPick, jFlip, jMap }
   local function Centre(mids)   -- centre a group of buttons between the chapter buttons
     local gap, total = 8, 0
     for _, b in ipairs(mids) do total = total + b:GetWidth() end
