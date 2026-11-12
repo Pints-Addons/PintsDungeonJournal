@@ -1,0 +1,8 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+  <Frame name="PintsDJDungeonPinTemplate" virtual="true" mixin="PintsDJDungeonPinMixin" enableMouse="true">
+    <Size x="22" y="22"/>
+    <Scripts>
+      <OnLoad method="OnLoad"/>
+    </Scripts>
+  </Frame>
+</Ui>

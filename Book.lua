@@ -258,7 +258,7 @@ local function WarmLocate()
         self:SetScript("OnUpdate", nil)
         NS.locWarm = true
         if locBudget.missed and WorldMapFrame and WorldMapFrame:IsShown() and WorldMapFrame.RefreshAllDataProviders then
-          locBudget.missed = nil; WorldMapFrame:RefreshAllDataProviders()
+          locBudget.missed = nil; if NS.RefreshDungeonPins then NS.RefreshDungeonPins() end   -- (only our own pins: refreshing them all spread taint to the game's)
         end
         return
       end

@@ -2,7 +2,7 @@
 ## Title: |cffd4a017Pint's|r Dungeon Journal
 ## Notes: Every Classic dungeon and raid (and WoW Forever's new dungeons) in a leather-bound book with your name on the cover - lore, bosses and their loot, and a chronicle of every run you finish with date, company and loot. /dj
 ## Author: Jake (Pint's Add-ons, built with Claude)
-## Version: 1.1.6
+## Version: 1.1.7
 ## X-Curse-Project-ID: 1779411
 ## X-License: GPL-3.0
 ## IconTexture: Interface\AddOns\PintsDungeonJournal\Icon
@@ -14,3 +14,5 @@ Book.lua
 JournalData.lua
 ForeverDungeons.lua
 Journal.lua
+MapPins.lua
+MapPins.xml

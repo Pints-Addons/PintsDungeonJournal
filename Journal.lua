@@ -1263,6 +1263,13 @@ function NS.JournalRefresh()
     if L and L:IsVisible() then NS.RenderJournal() end
   end)
 end
+-- open the journal at a dungeon (the map's dungeon icons)
+function NS.JournalOpenTo(idx)
+  local QB = _G.PintsDungeonJournal
+  if QB and QB.OpenBook then QB.OpenBook("journal") end
+  jIdx, jPage, selRun = idx, 1, nil
+  if NS.RenderJournal then NS.RenderJournal() end
+end
 -- open straight to a dungeon (used by /qb journal while inside one)
 function NS.JournalOpenHere()
   if DungeonHere() then jIdx, jPage, selRun = DefaultDungeon(), 1, nil end

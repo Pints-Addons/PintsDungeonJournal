@@ -1,5 +1,11 @@
 Pint's Dungeon Journal - Changelog
 
+v1.1.7
+- Dungeon icons on the world map at every entrance (zone maps and continents) - the original dungeons and raids and
+  WoW Forever's new ones. Hover for the dungeons there and their levels (coloured for your level); Ctrl-click opens it
+  in the journal, Ctrl-Shift-click points the arrow there. A plain click still zooms the map.
+- A new dungeon without a known spot gets its icon after you first walk in: the journal remembers where you entered.
+
 v1.1.6
 - WoW Forever: every new dungeon is in the journal now - Hall of Thanes (13-18), Excavation Site: Wetlands (26-33),
   The Drowned City (35-40), Krol'dok Stronghold (40-45), Alcaz Prison (48-53), Blackmaw Hold (55-60) and Shaper's
