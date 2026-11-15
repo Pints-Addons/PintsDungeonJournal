@@ -1,5 +1,10 @@
 Pint's Dungeon Journal - Changelog
 
+v1.1.8
+- WoW Forever: the original dungeons' level ranges are Forever's now (checked against Wowhead's WoW Forever
+  database) - Ragefire Chasm 15-25, The Deadmines 15-25, Razorfen Kraul 32-42, Maraudon 42-52, Dire Maul 44-54,
+  Stratholme 48-58 and others. Classic Era keeps Classic's ranges.
+
 v1.1.7
 - Dungeon icons on the world map at every entrance (zone maps and continents) - the original dungeons and raids and
   WoW Forever's new ones. Hover for the dungeons there and their levels (coloured for your level); Ctrl-click opens it

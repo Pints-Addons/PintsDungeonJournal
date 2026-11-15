@@ -195,3 +195,22 @@ Add({ -1009, "Shaper's Terrace", "Un'Goro Crater", 58, 60, 0, { "Bolt", "Cinder"
 		{ "Snowtalon", "?", {} },
 		{ "Nanaya", "?", {} },
 	} })
+
+-- WoW Forever's level ranges for the original dungeons (Wowhead's WoW Forever database, November 15, 2026). Wowhead gives
+-- one range per dungeon, so Dire Maul's and Stratholme's wings all get theirs; Scarlet Monastery's and Blackrock Spire's
+-- wings keep their own (they fit inside Forever's). Classic Era keeps Classic's ranges.
+if type(issecretvalue) == "function" then
+	local FOREVER_LEVELS = {
+		["Ragefire Chasm"] = { 15, 25 }, ["Wailing Caverns"] = { 17, 27 }, ["The Deadmines"] = { 15, 25 },
+		["Shadowfang Keep"] = { 22, 30 }, ["Blackfathom Deeps"] = { 22, 32 }, ["The Stockade"] = { 22, 32 },
+		["Gnomeregan"] = { 26, 36 }, ["Razorfen Kraul"] = { 32, 42 }, ["Razorfen Downs"] = { 37, 47 },
+		["Uldaman"] = { 42, 52 }, ["Zul'Farrak"] = { 46, 56 }, ["Maraudon"] = { 42, 52 }, ["Sunken Temple"] = { 50, 60 },
+		["Blackrock Depths"] = { 52, 60 }, ["Dire Maul: East"] = { 44, 54 }, ["Dire Maul: West"] = { 44, 54 },
+		["Dire Maul: North"] = { 44, 54 }, ["Scholomance"] = { 55, 60 }, ["Stratholme: Live"] = { 48, 58 },
+		["Stratholme: Undead"] = { 48, 58 },
+	}
+	for _, d in ipairs(JD.dungeons) do
+		local l = FOREVER_LEVELS[d[2]]
+		if l then d[4], d[5] = l[1], l[2] end
+	end
+end
