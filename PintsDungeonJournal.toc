@@ -12,6 +12,7 @@
 Zones.lua
 Book.lua
 JournalData.lua
+BossSpots.lua
 ForeverDungeons.lua
 Journal.lua
 MapPins.lua

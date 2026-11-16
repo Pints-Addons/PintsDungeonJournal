@@ -1,9 +1,13 @@
 Pint's Dungeon Journal - Changelog
 
 v1.1.8
-- WoW Forever: the original dungeons' level ranges are Forever's now (checked against Wowhead's WoW Forever
-  database) - Ragefire Chasm 15-25, The Deadmines 15-25, Razorfen Kraul 32-42, Maraudon 42-52, Dire Maul 44-54,
+- WoW Forever: the original dungeons' level ranges are Forever's now - Ragefire Chasm 15-25, The Deadmines 15-25, Razorfen Kraul 32-42, Maraudon 42-52, Dire Maul 44-54,
   Stratholme 48-58 and others. Classic Era keeps Classic's ranges.
+- Map: every boss is marked on the dungeon's map - a numbered skull (its place in the journal's list; hover for the
+  name). 237 bosses, placed from the CMaNGOS Classic world database; summoned and wandering ones (Ragnaros, Gahz'rilla,
+  Zul'Gurub's Edge of Madness...) are left off. Where floors sit over each other a boss can show on both.
+- Map: the way in is marked - a green tick and its name (Entrance, Entrance (back door), Exit...) - on the game's own
+  maps, so you can tell which way you're facing.
 
 v1.1.7
 - Dungeon icons on the world map at every entrance (zone maps and continents) - the original dungeons and raids and

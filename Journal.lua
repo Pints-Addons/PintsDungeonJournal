@@ -580,6 +580,27 @@ local function MapsFor(d)
 end
 local mapFloor = {}       -- dungeon index -> floor picked
 
+-- boss spots (BossSpots.lua: world positions) -> this floor's map, through the game's own world -> map transform.
+-- The axis order is checked once against a known spot (Marshal McBride in Northshire, Elwynn Forest).
+local apiOrder
+local function ApiPos(inst, a, b, uiMap)
+  local ok, _, pos = pcall(C_Map.GetMapPosFromWorldPos, inst, CreateVector2D(a, b), uiMap)
+  if ok and pos then return pos:GetXY() end
+end
+local function MapPos(inst, wx, wy, uiMap)
+  if not (C_Map and C_Map.GetMapPosFromWorldPos and CreateVector2D) then return end
+  if apiOrder == nil then
+    apiOrder = false
+    for _, o in ipairs({ 1, 2 }) do
+      local x, y = ApiPos(0, o == 1 and -8902.6 or -162.6, o == 1 and -162.6 or -8902.6, 1429)
+      if x and x > 0.3 and x < 0.7 and y > 0.2 and y < 0.6 then apiOrder = o; break end
+    end
+  end
+  if not apiOrder then return end
+  local x, y = ApiPos(inst, apiOrder == 1 and wx or wy, apiOrder == 1 and wy or wx, uiMap)
+  if x and x >= 0 and x <= 1 and y >= 0 and y <= 1 then return x, y end
+end
+
 local function BuildPages()
   local win = NS.Win(); local B = NS.Book
   L = CreateFrame("Frame", nil, win.left); L:SetAllPoints(); L:SetFrameLevel(win.left:GetFrameLevel() + 5); L:Hide()
@@ -646,6 +667,9 @@ local function BuildPages()
   M.empty = M:CreateFontString(nil, "OVERLAY", B.F_BODY); M.empty:SetPoint("TOPLEFT", 28, -110); M.empty:SetWidth(B.PAGE_W - 60)
   M.empty:SetJustifyH("LEFT"); M.empty:SetSpacing(3); Ink(M.empty, B.INK_SOFT)
   M.you = M.clip:CreateTexture(nil, "OVERLAY"); M.you:SetSize(18, 18); M.you:SetTexture("Interface\\Minimap\\MinimapArrow"); M.you:Hide()
+  M.pins = {}
+  -- (the game has no map of this dungeon) our own drawn map of it (DrawnMaps.lua, Maps\*.tga)
+  M.drawn = M.clip:CreateTexture(nil, "ARTWORK"); M.drawn:SetAllPoints(M.clip); M.drawn:Hide()
 
   -- right page, spread 2: one run in full
   local Dt = CreateFrame("Frame", nil, R); Dt:SetAllPoints(); R.detail = Dt
@@ -1128,18 +1152,60 @@ local function RenderRun(d)
   Dt.sf:SetVerticalScroll(0); Dt.sf.Update()
 end
 
+-- a numbered skull on the map (hover: the boss)
+local function PlacePin(M, n, order, name, px, py)
+  local p = M.pins[n]
+  if not p then
+    p = CreateFrame("Button", nil, M.clip); p:SetSize(16, 16)
+    p.icon = p:CreateTexture(nil, "OVERLAY"); p.icon:SetAllPoints(); p.icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_8")
+    p.num = p:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); p.num:SetPoint("LEFT", p, "RIGHT", 1, 0)
+    p:SetScript("OnEnter", function(self) GameTooltip:SetOwner(self, "ANCHOR_RIGHT"); GameTooltip:AddLine(self.name, 1, 0.82, 0); GameTooltip:AddLine("Boss " .. self.order .. " in the journal's list", 1, 1, 1); GameTooltip:Show() end)
+    p:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    M.pins[n] = p
+  end
+  p.name, p.order = name, order
+  p.num:SetText(order)
+  p:ClearAllPoints(); p:SetPoint("CENTER", M.clip, "TOPLEFT", px, -py); p:Show()
+end
+-- where you come in: a green mark with its name beside it ("Entrance", "Entrance (back door)", "Exit")
+local function PlaceEntrance(M, n, label, px, py)
+  M.ents = M.ents or {}
+  local e = M.ents[n]
+  if not e then
+    e = CreateFrame("Frame", nil, M.clip); e:SetSize(16, 16)
+    e.icon = e:CreateTexture(nil, "OVERLAY"); e.icon:SetAllPoints(); e.icon:SetTexture("Interface\\RaidFrame\\ReadyCheck-Ready")
+    e.t = e:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); e.t:SetPoint("LEFT", e, "RIGHT", 2, 0); e.t:SetTextColor(0.1, 0.45, 0.1)
+    M.ents[n] = e
+  end
+  e.t:SetText(label)
+  e:ClearAllPoints(); e:SetPoint("CENTER", M.clip, "TOPLEFT", px, -py); e:Show()
+end
 local function RenderMap(d)
   local M, B = L.map, NS.Book
   M.chapter:SetText("~ " .. d[2] .. " ~")
   local list = MapsFor(d)
   for _, t in ipairs(M.tiles) do t:Hide() end
   for _, f in ipairs(M.floors) do f:Hide() end
-  M.you:Hide()
+  M.you:Hide(); M.drawn:Hide()
+  for _, e in ipairs(M.ents or {}) do e:Hide() end
+  for _, p in ipairs(M.pins) do p:Hide() end
   if #list == 0 then
     M.sub:SetText(d[3] .. "  -  levels " .. d[4] .. "-" .. d[5])
     M.clip:Hide(); M.edge:Hide()
     M.empty:SetText("The game has no map of this dungeon" .. ((d[1] or 0) < 0 and " yet (new in WoW Forever - it appears here once the game has one)." or "."))
     M.empty:Show()
+    local dm = _G.PintsJournalDrawnMaps and _G.PintsJournalDrawnMaps[d[2]]
+    if dm then
+      -- a drawn sketch of the halls (from where every creature and object stands), with the bosses on it
+      M.empty:Hide()
+      M.sub:SetText(d[3] .. "  -  levels " .. d[4] .. "-" .. d[5] .. "  -  drawn map (not the game's), north is up")
+      local top = 80
+      local side = math.min(B.PAGE_W - 48, B.PAGE_H - top - 30)
+      M.clip:ClearAllPoints(); M.clip:SetPoint("TOP", M, "TOP", 0, -top); M.clip:SetSize(side, side); M.clip:Show(); M.edge:Show()
+      M.drawn:SetTexture("Interface\\AddOns\\PintsDungeonJournal\\Maps\\" .. dm[1]); M.drawn:Show()
+      for n, b in ipairs(dm[2]) do PlacePin(M, n, b[1], b[2], b[3] * side, b[4] * side) end
+      for n, e in ipairs(dm[3] or {}) do PlaceEntrance(M, n, e[1], e[2] * side, e[3] * side) end
+    end
     return
   end
   M.empty:Hide()
@@ -1179,6 +1245,42 @@ local function RenderMap(d)
     if not t then t = M.clip:CreateTexture(nil, "ARTWORK"); M.tiles[i] = t end
     local r, c = math.floor((i - 1) / cols), (i - 1) % cols
     t:SetTexture(file); t:SetSize(tw, th); t:ClearAllPoints(); t:SetPoint("TOPLEFT", M.clip, "TOPLEFT", c * tw, -r * th); t:Show()
+  end
+  -- the bosses: a numbered skull at each one's spot (on every floor its spot falls inside - floors that sit over each
+  -- other can't be told apart from a position alone)
+  local spots = _G.PintsJournalBossSpots and _G.PintsJournalBossSpots[d[2]]
+  local inst = spots and spots[1]
+  if inst and type(inst) == "number" and inst > 0 then
+    local n = 0
+    for i = 2, #spots do
+      local sp = spots[i]
+      local bx, by = MapPos(inst, sp[3], sp[4], e.id)
+      if bx then
+        n = n + 1
+        local p = M.pins[n]
+        if not p then
+          p = CreateFrame("Button", nil, M.clip); p:SetSize(16, 16)
+          p.icon = p:CreateTexture(nil, "OVERLAY"); p.icon:SetAllPoints(); p.icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_8")
+          p.num = p:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); p.num:SetPoint("LEFT", p, "RIGHT", 1, 0)
+          p:SetScript("OnEnter", function(self) GameTooltip:SetOwner(self, "ANCHOR_RIGHT"); GameTooltip:AddLine(self.name, 1, 0.82, 0); GameTooltip:AddLine("Boss " .. self.order .. " in the journal's list", 1, 1, 1); GameTooltip:Show() end)
+          p:SetScript("OnLeave", function() GameTooltip:Hide() end)
+          M.pins[n] = p
+        end
+        p.name, p.order = sp[2], sp[1]
+        p.num:SetText(sp[1])
+        p:ClearAllPoints(); p:SetPoint("CENTER", M.clip, "TOPLEFT", bx * w, -by * h); p:Show()
+      end
+    end
+  end
+  -- the way in (and out), on the game's own map
+  local ents = _G.PintsJournalEntrances and _G.PintsJournalEntrances[d[2]]
+  local einst = (type(inst) == "number" and inst) or d[1]
+  if ents and einst and einst > 0 then
+    local n = 0
+    for _, en in ipairs(ents) do
+      local ex, ey = MapPos(einst, en[2], en[3], e.id)
+      if ex then n = n + 1; PlaceEntrance(M, n, en[1], ex * w, ey * h) end
+    end
   end
   -- you, when you're on this floor
   if C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player") == e.id and C_Map.GetPlayerMapPosition then
