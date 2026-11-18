@@ -461,6 +461,8 @@ end)
 local L, R
 local jIdx, jPage, selRun
 local bossRows, itemRows, runRows, mateRows, lootRows = {}, {}, {}, {}, {}
+local showQuests                 -- the right page shows the dungeon's quests in place of Bosses & Spoils
+local questRows = {}
 
 local function Ink(fs, c, a) fs:SetTextColor(c[1], c[2], c[3], a or 1) end
 local function When(t, fmt) return ((date(fmt or "%B %d, %Y at %I:%M %p", t):gsub(" 0(%d)", " %1"):gsub("^0(%d)", "%1"))) end
@@ -635,6 +637,31 @@ local function BuildPages()
   local sf, list = B.Scroller(S, "PintsDJJournalLoot"); sf:SetPoint("TOPLEFT", 52, -70); sf:SetPoint("BOTTOMRIGHT", -20, 30)
   sf.cue:SetPoint("BOTTOMRIGHT", -22, 12); list:SetSize(B.PAGE_W - 72, 1)
   S.sf, S.list = sf, list
+  -- page links: Bosses & Spoils <-> Quests
+  local function PageLink(parent, text, onClick)
+    local b = CreateFrame("Button", nil, parent); b:SetSize(120, 18)
+    b.t = b:CreateFontString(nil, "OVERLAY", B.F_SMALL); b.t:SetPoint("RIGHT"); b.t:SetText(text); Ink(b.t, B.RUBRIC)
+    b:SetScript("OnEnter", function(self) self.t:SetAlpha(0.7) end); b:SetScript("OnLeave", function(self) self.t:SetAlpha(1) end)
+    b:SetScript("OnClick", function()
+      onClick()
+      if SOUNDKIT and SOUNDKIT.IG_ABILITY_PAGE_TURN then PlaySound(SOUNDKIT.IG_ABILITY_PAGE_TURN) end
+      NS.RenderJournal()
+    end)
+    return b
+  end
+  S.toQuests = PageLink(S, "Quests >", function() showQuests = true end); S.toQuests:SetPoint("TOPRIGHT", -24, -8)
+
+  -- right page: the dungeon's quests. Each chain is a column of numbered steps on a gold line (done steps green, the
+  -- one you're on gold); steps picked up outside the dungeon say where they start
+  local Qp = CreateFrame("Frame", nil, R); Qp:SetAllPoints(); R.quests = Qp; Qp:Hide()
+  Qp.title = Qp:CreateFontString(nil, "OVERLAY", B.F_TITLE); Qp.title:SetPoint("TOPLEFT", 52, -18); Qp.title:SetText("Quests")
+  Qp.sub = Qp:CreateFontString(nil, "OVERLAY", B.F_SMALL); Qp.sub:SetPoint("TOPLEFT", Qp.title, "BOTTOMLEFT", 2, -2); Ink(Qp.sub, B.INK_SOFT)
+  Qp.back = PageLink(Qp, "< Bosses & Spoils", function() showQuests = false end); Qp.back:SetPoint("TOPRIGHT", -24, -8)
+  local sfQ, listQ = B.Scroller(Qp, "PintsDJJournalQuests"); sfQ:SetPoint("TOPLEFT", 52, -70); sfQ:SetPoint("BOTTOMRIGHT", -20, 30)
+  sfQ.cue:SetPoint("BOTTOMRIGHT", -22, 12); listQ:SetSize(B.PAGE_W - 72, 1)
+  Qp.sf, Qp.list = sfQ, listQ
+  Qp.empty = Qp:CreateFontString(nil, "OVERLAY", B.F_BODY); Qp.empty:SetPoint("TOPLEFT", 56, -80); Qp.empty:SetWidth(B.PAGE_W - 90)
+  Qp.empty:SetJustifyH("LEFT"); Qp.empty:SetSpacing(3); Ink(Qp.empty, B.INK_SOFT)
 
   -- left page, spread 2: the chronicle of runs
   local C = CreateFrame("Frame", nil, L); C:SetAllPoints(); L.chron = C
@@ -1322,6 +1349,162 @@ function NS.ShowJournalPages(on)
   if L then L:SetShown(on); R:SetShown(on) end
 end
 
+---------------------------------------------------------------- the dungeon's quests (from Pint's Quest Book's quest data)
+-- which of the game's zone numbers each dungeon's quests are filed under
+local QUEST_AREA = {
+  ["Ragefire Chasm"] = { 2437 }, ["Wailing Caverns"] = { 718 }, ["The Deadmines"] = { 1581 }, ["Shadowfang Keep"] = { 209 },
+  ["Blackfathom Deeps"] = { 719 }, ["The Stockade"] = { 717 }, ["Gnomeregan"] = { 721 }, ["Razorfen Kraul"] = { 491 },
+  ["Scarlet Monastery"] = { 796 }, ["Razorfen Downs"] = { 722 }, ["Uldaman"] = { 1337 }, ["Zul'Farrak"] = { 1176 },
+  ["Maraudon"] = { 2100 }, ["Sunken Temple"] = { 1477, 1417 }, ["Blackrock Depths"] = { 1584 }, ["Blackrock Spire"] = { 1583 },
+  ["Dire Maul"] = { 2557 }, ["Scholomance"] = { 2057 }, ["Stratholme"] = { 2017 }, ["Zul'Gurub"] = { 1977 },
+  ["Onyxia's Lair"] = { 2159 }, ["Molten Core"] = { 2717 }, ["Blackwing Lair"] = { 2677 }, ["Ruins of Ahn'Qiraj"] = { 3429 },
+  ["Temple of Ahn'Qiraj"] = { 3428 }, ["Naxxramas"] = { 3456 }, ["Ruins of Lordaeron"] = { 16611 }, ["City of Dalaran"] = { 16544, 16560 },
+  ["Hall of Thanes"] = { 16919 }, ["Excavation Site: Wetlands"] = { 16732 }, ["The Drowned City"] = { 16550 },
+  ["Krol'dok Stronghold"] = { 16842 }, ["Alcaz Prison"] = { 16620 }, ["Blackmaw Hold"] = { 16554 }, ["Shaper's Terrace"] = { 16667 },
+}
+local function QuestAreas(d)
+  local n = d[2]
+  local key = n:match("^Scarlet Monastery") and "Scarlet Monastery" or n:match("Blackrock Spire") and "Blackrock Spire"
+    or n:match("^Dire Maul") and "Dire Maul" or n:match("^Stratholme") and "Stratholme" or n
+  local set = {}
+  for _, a in ipairs(QUEST_AREA[key] or {}) do set[a] = true end
+  return set
+end
+local function QDone(id) return C_QuestLog and C_QuestLog.IsQuestFlaggedCompleted and C_QuestLog.IsQuestFlaggedCompleted(id) or false end
+local function QOn(id)
+  if C_QuestLog and C_QuestLog.IsOnQuest then local ok, r = pcall(C_QuestLog.IsOnQuest, id); if ok then return r and true or false end end
+  return GetQuestLogIndexByID and (GetQuestLogIndexByID(id) or 0) > 0 or false
+end
+local function QuestRow(i)
+  local r = questRows[i]; if r then return r end
+  local B = NS.Book
+  r = CreateFrame("Button", nil, R.quests.list); r:SetSize(B.PAGE_W - 76, 22)
+  local hl = r:CreateTexture(nil, "HIGHLIGHT"); hl:SetAllPoints(); hl:SetColorTexture(0.45, 0.30, 0.10, 0.12)
+  r.line = r:CreateTexture(nil, "ARTWORK"); r.line:SetWidth(3); r.line:SetColorTexture(B.GOLD[1], B.GOLD[2], B.GOLD[3], 0.95)
+  r.ring = r:CreateTexture(nil, "OVERLAY", nil, 0); r.ring:SetSize(20, 20); r.ring:SetTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMask")
+  r.ring:SetVertexColor(B.GOLD[1], B.GOLD[2], B.GOLD[3], 1); r.ring:SetPoint("CENTER", r, "LEFT", 12, 0)
+  r.badge = r:CreateTexture(nil, "OVERLAY", nil, 1); r.badge:SetSize(17, 17); r.badge:SetTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMask")
+  r.badge:SetPoint("CENTER", r, "LEFT", 12, 0)
+  r.n = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall"); r.n:SetPoint("CENTER", r.badge, "CENTER")
+  r.title = r:CreateFontString(nil, "OVERLAY", B.F_BODY); r.title:SetPoint("LEFT", 28, 0); r.title:SetJustifyH("LEFT"); r.title:SetWordWrap(false)
+  r.right = r:CreateFontString(nil, "OVERLAY", B.F_SMALL); r.right:SetPoint("RIGHT", -2, 0); Ink(r.right, B.INK_SOFT)
+  r.title:SetPoint("RIGHT", r.right, "LEFT", -6, 0)
+  r:SetScript("OnEnter", function(self)
+    local D = _G.PintsQuestData
+    local q = D and self.id and D.quests[self.id]; if not q then return end
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:AddLine(q[1], 1, 0.82, 0)
+    GameTooltip:AddLine(("Level %d  (from level %d)"):format(q[2] or 0, q[3] or 0), 1, 1, 1)
+    local who = q.from or (q[13] and q[13] > 0 and D.names[q[13]])
+    local to = q.to or (q[14] and q[14] > 0 and D.names[q[14]])
+    if who then GameTooltip:AddLine("From: " .. who, 0.8, 0.8, 0.8) end
+    if to and to ~= who then GameTooltip:AddLine("Hand in to: " .. to, 0.8, 0.8, 0.8) end
+    if self.step then GameTooltip:AddLine(("Step %d of %d in this chain"):format(self.step, self.of), 0.85, 0.66, 0.26) end
+    if q[15] and q[15] ~= "" then GameTooltip:AddLine(" "); GameTooltip:AddLine(q[15], 1, 1, 1, true) end
+    GameTooltip:AddLine("Click: open it in Pint's Quest Book", 0.5, 0.5, 0.5)
+    GameTooltip:Show()
+  end)
+  r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  r:SetScript("OnClick", function(self)
+    local QB = _G.PintsQuestBook
+    if QB and QB.OpenQuest and self.id then QB.OpenQuest(self.id) elseif QB and QB.Toggle then QB.Toggle() end
+  end)
+  questRows[i] = r
+  return r
+end
+local function RenderQuests(d)
+  local B = NS.Book
+  local P = R.quests
+  local D = _G.PintsQuestData
+  for _, r in ipairs(questRows) do r:Hide() end
+  if not D then
+    P.sub:SetText(""); P.empty:SetText("The quests come from Pint's Quest Book - turn it on to see this dungeon's quests and their chains here."); P.empty:Show()
+    P.list:SetHeight(1); return
+  end
+  local areas = QuestAreas(d)
+  local fac = (UnitFactionGroup("player") == "Horde") and 1 or 2
+  local _, _, classID = UnitClass("player")
+  local cbit = classID and 2 ^ (classID - 1) or 0
+  local function ok(id)
+    local q = D.quests[id]
+    if not q or q.notHere then return false end
+    if q[5] ~= 0 and q[5] ~= fac then return false end
+    if (q[6] or 0) ~= 0 and cbit > 0 and math.floor(q[6] / cbit) % 2 == 0 then return false end
+    return true
+  end
+  -- quests filed under this dungeon, and every step of the chains they belong to
+  local mine, roots, rootSet = {}, {}, {}
+  for id, q in pairs(D.quests) do if areas[q[4]] and ok(id) then mine[id] = true end end
+  local kids = {}
+  for id, q in pairs(D.quests) do
+    local p = q[7] or 0
+    if p > 0 and ok(id) and ok(p) then kids[p] = kids[p] or {}; table.insert(kids[p], id) end
+  end
+  for _, l in pairs(kids) do table.sort(l, function(a, c) return (D.quests[a][2] or 0) < (D.quests[c][2] or 0) end) end
+  for id in pairs(mine) do
+    local r, seen = id, {}
+    while true do
+      local p = D.quests[r][7] or 0
+      if p == 0 or not ok(p) or seen[p] then break end
+      seen[r] = true; r = p
+    end
+    if not rootSet[r] then rootSet[r] = true; roots[#roots + 1] = r end
+  end
+  local chains = {}
+  for _, r in ipairs(roots) do
+    local steps, lv = {}, 99
+    local function walk(id, depth)
+      steps[#steps + 1] = { id = id, depth = depth }
+      if mine[id] then lv = math.min(lv, D.quests[id][2] or 99) end
+      for _, c in ipairs(kids[id] or {}) do walk(c, depth + 1) end
+    end
+    walk(r, 1)
+    chains[#chains + 1] = { steps = steps, lv = lv }
+  end
+  table.sort(chains, function(a, c) if a.lv ~= c.lv then return a.lv < c.lv end return D.quests[a.steps[1].id][1] < D.quests[c.steps[1].id][1] end)
+  local y, i, nq, ndone = 0, 0, 0, 0
+  local plvl = UnitLevel("player") or 1
+  for _, ch in ipairs(chains) do
+    local single = #ch.steps == 1
+    local maxDepth = 0
+    for _, st in ipairs(ch.steps) do maxDepth = math.max(maxDepth, st.depth) end
+    for k, st in ipairs(ch.steps) do
+      i = i + 1
+      local r = QuestRow(i)
+      local q = D.quests[st.id]
+      r.id, r.step, r.of = st.id, (not single) and st.depth or nil, maxDepth
+      r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y)
+      local done, on = QDone(st.id), QOn(st.id)
+      if mine[st.id] then nq = nq + 1; if done then ndone = ndone + 1 end end
+      -- the step disc: green when done, gold (with a ring) when you're on it, dark ink when still ahead
+      if done then r.badge:SetVertexColor(0.18, 0.48, 0.18, 1)
+      elseif on then r.badge:SetVertexColor(B.GOLD[1], B.GOLD[2], B.GOLD[3], 1)
+      else r.badge:SetVertexColor(0.30, 0.22, 0.12, 1) end
+      r.ring:SetShown(on and not done)
+      r.n:SetText(single and "!" or st.depth)
+      if on and not done then r.n:SetTextColor(0.15, 0.08, 0) else r.n:SetTextColor(1, 0.95, 0.85) end
+      -- the gold line joining the steps (top half on the first, bottom half on the last)
+      r.line:ClearAllPoints()
+      r.line:SetPoint("TOP", r, "TOPLEFT", 12, (k == 1) and -11 or 0)
+      r.line:SetPoint("BOTTOM", r, "BOTTOMLEFT", 12, (k == #ch.steps) and 11 or 0)
+      r.line:SetShown(not single)
+      local col = done and B.INK_FAINT or (mine[st.id] and B.INK or B.INK_SOFT)
+      local lvc = (q[2] or 0) > plvl + 4 and "|cffb01010" or (q[2] or 0) > plvl + 2 and "|cffc06010" or ((q[2] or 0) < plvl - 7 and "|cff7a7a7a" or "|cff1a6a1a")
+      r.title:SetText(lvc .. "[" .. ((q[2] or 0) > 0 and q[2] or "?") .. "]|r " .. ("|cff%02x%02x%02x"):format(col[1] * 255, col[2] * 255, col[3] * 255) .. q[1] .. "|r")
+      local where = mine[st.id] and "" or "leads in"
+      local stt = done and "|cff1a6a1adone|r" or on and "|cffa06a10in your log|r" or ((q[3] or 0) > plvl and ("|cffb01010from level " .. q[3] .. "|r") or "")
+      r.right:SetText((stt ~= "" and where ~= "") and (stt .. "  -  " .. where) or (stt ~= "" and stt or where))
+      r:Show()
+      y = y + 22
+    end
+    y = y + 10
+  end
+  P.sub:SetText(nq > 0 and ("%d quests here  -  %d done  -  %d chain%s"):format(nq, ndone, #chains, #chains == 1 and "" or "s") or "")
+  P.empty:SetText("No quests are known for this dungeon yet."); P.empty:SetShown(nq == 0)
+  P.list:SetHeight(math.max(1, y))
+  P.sf:SetVerticalScroll(0); P.sf.Update()
+end
+
 function NS.RenderJournal()
   if not JD or #DUN == 0 then return end
   if not L then BuildPages() end
@@ -1335,7 +1518,7 @@ function NS.RenderJournal()
   local three = (jPage == 3)
   if w and w.jFlip then w.jFlip:SetText(two and "Lore & spoils" or "Chronicle of runs") end
   if w and w.jMap then w.jMap:SetText(three and "Lore" or "Map") end
-  L.tale:SetShown(not two and not three); R.spoils:SetShown(not two)
+  L.tale:SetShown(not two and not three); R.spoils:SetShown(not two and not showQuests); R.quests:SetShown(not two and showQuests and true or false)
   L.chron:SetShown(two); R.detail:SetShown(two)
   L.map:SetShown(three)
   if w and w.pageL then
@@ -1349,10 +1532,10 @@ function NS.RenderJournal()
     if selRun then RenderRun(d) else RenderRunList(d, runs) end
   elseif three then
     RenderMap(d)
-    RenderSpoils(d)
+    if showQuests then RenderQuests(d) else RenderSpoils(d) end
   else
     RenderTale(d)
-    RenderSpoils(d)
+    if showQuests then RenderQuests(d) else RenderSpoils(d) end
   end
 end
 
