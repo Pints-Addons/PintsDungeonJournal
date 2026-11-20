@@ -17,6 +17,13 @@ local function Say(msg) print("|cffd4a24cDungeon Journal|r: " .. msg) end
 
 local JD = PintsJournalData
 local DUN = JD and JD.dungeons or {}
+-- WoW Forever: raids that haven't opened there stay out of sight (the book's dungeon menu can show them); add a raid here once
+-- it opens on Forever
+local FOREVER_OPEN = {}
+local function Hidden(d)
+  if type(issecretvalue) ~= "function" or d[6] ~= 1 or FOREVER_OPEN[d[2]] then return false end
+  local x = db(); return not (x and x.showUnconfirmed)
+end
 local ITEMS = JD and JD.items or {}
 -- Some dungeons share one map but are separate instances (the Scarlet Monastery and Dire Maul wings). The game reports
 -- the same map for each, so the wing is told apart by which bosses die there.
@@ -487,7 +494,10 @@ local function Turn(dir)
 end
 function NS.JournalTurn(dir)
   if not jIdx then jIdx = DefaultDungeon() end
-  jIdx = ((jIdx - 1 + dir) % #DUN) + 1
+  for _ = 1, #DUN do
+    jIdx = ((jIdx - 1 + dir) % #DUN) + 1
+    if not Hidden(DUN[jIdx]) then break end
+  end
   jPage, selRun = 1, nil
   Turn(dir)
 end
@@ -1216,6 +1226,22 @@ local function RenderMap(d)
   M.you:Hide(); M.drawn:Hide()
   for _, e in ipairs(M.ents or {}) do e:Hide() end
   for _, p in ipairs(M.pins) do p:Hide() end
+  -- WoW Forever's new dungeons: the boss spots from Wowhead name the game's own map they're on - when the map couldn't be
+  -- found by the dungeon's name, those maps are the ones to draw
+  local fs = _G.PintsJournalForeverSpots and _G.PintsJournalForeverSpots[d[2]]
+  if #list == 0 and fs and C_Map and C_Map.GetMapInfo and C_Map.GetMapArtLayers then
+    local seen = {}
+    list = {}
+    for _, sp in ipairs(fs) do
+      local id = sp[3]
+      if id and not seen[id] then
+        seen[id] = true
+        local ok, info = pcall(C_Map.GetMapInfo, id)
+        local okL, layers = pcall(C_Map.GetMapArtLayers, id)
+        if ok and info and okL and layers and layers[1] then list[#list + 1] = { id = id, name = info.name, floor = info.name } end
+      end
+    end
+  end
   if #list == 0 then
     M.sub:SetText(d[3] .. "  -  levels " .. d[4] .. "-" .. d[5])
     M.clip:Hide(); M.edge:Hide()
@@ -1299,6 +1325,14 @@ local function RenderMap(d)
       end
     end
   end
+  -- WoW Forever's new dungeons: boss spots from Wowhead's WoW Forever NPC pages, as map % on the game's own map
+  if fs then
+    local n = 0
+    for _, p in ipairs(M.pins) do if p:IsShown() then n = n + 1 end end
+    for _, sp in ipairs(fs) do
+      if sp[3] == e.id then n = n + 1; PlacePin(M, n, sp[1], sp[2], sp[4] / 100 * w, sp[5] / 100 * h) end
+    end
+  end
   -- the way in (and out), on the game's own map
   local ents = _G.PintsJournalEntrances and _G.PintsJournalEntrances[d[2]]
   local einst = (type(inst) == "number" and inst) or d[1]
@@ -1330,11 +1364,22 @@ end
 function NS.JournalPick(owner)
   local items = { { text = "Dungeons", header = true } }
   for i, d in ipairs(DUN) do if d[6] == 0 then items[#items + 1] = { text = d[2], right = d[4] .. "-" .. d[5], value = i } end end
-  items[#items + 1] = { text = "Raids", header = true }
-  for i, d in ipairs(DUN) do if d[6] == 1 then items[#items + 1] = { text = d[2], right = "60", value = i } end end
+  local anyHidden, raids = false, {}
+  for i, d in ipairs(DUN) do
+    if d[6] == 1 then
+      if Hidden(d) then anyHidden = true else raids[#raids + 1] = { text = d[2] .. ((type(issecretvalue) == "function" and not FOREVER_OPEN[d[2]]) and "  |cff909090(not open on Forever)|r" or ""), right = "60", value = i } end
+    end
+  end
+  if #raids > 0 then items[#items + 1] = { text = "Raids", header = true }; for _, r in ipairs(raids) do items[#items + 1] = r end end
+  -- (WoW Forever: raids not open there yet - shown on request)
+  local x = db()
+  if anyHidden or (type(issecretvalue) == "function" and x and x.showUnconfirmed) then
+    items[#items + 1] = { text = "|cff909090" .. ((x and x.showUnconfirmed) and "Hide" or "Show") .. " raids not open on Forever|r", value = -1 }
+  end
   if NS.ShowMenu then
     NS.ShowMenu(owner, items, function(v)
       if not v then return end
+      if v == -1 then local x = db(); if x then x.showUnconfirmed = not x.showUnconfirmed end; if DUN[jIdx or 1] and Hidden(DUN[jIdx or 1]) then jIdx = DefaultDungeon() end; Turn(1); return end
       local dir = (v >= (jIdx or 1)) and 1 or -1
       jIdx, jPage, selRun = v, 1, nil; Turn(dir)
     end)

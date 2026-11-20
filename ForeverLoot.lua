@@ -1689,3 +1689,15 @@ for _, d in ipairs(JD.dungeons) do
 	local l = L[d[2]]
 	if l then for _, b in ipairs(d[9]) do if l[b[1]] then b[3] = l[b[1]] end end end
 end
+-- bosses WoW Forever added to the old dungeons (Wowhead's WoW Forever database, November 18, 2026): every other boss in
+-- the Classic dungeons and raids is still there on Forever, at the same level
+local EXTRA = {
+	["Razorfen Downs"] = { { "Virulent Blood of Agamaggan", 42, { 260237, 87, 14247, 6, 15152, 3 } } },
+}
+for _, d in ipairs(JD.dungeons) do
+	for _, b in ipairs(EXTRA[d[2]] or {}) do
+		local have = false
+		for _, x in ipairs(d[9]) do if x[1] == b[1] then have = true end end
+		if not have then table.insert(d[9], math.max(1, #d[9]), { b[1], b[2], b[3] }) end   -- (before the last boss)
+	end
+end

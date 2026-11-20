@@ -1,5 +1,17 @@
 Pint's Dungeon Journal - Changelog
 
+v1.1.10
+- WoW Forever: the Classic dungeons and raids checked against Wowhead's WoW Forever database - every boss is still
+  there at the same level. Razorfen Downs gains the boss Forever added, Virulent Blood of Agamaggan (level 42), and
+  its drops.
+- WoW Forever: Blackmaw Hold lists all its bosses (Withermaw, Bonesnout the Unbroken, Moontouched Wanderer, Impaan the
+  Imprisoner, Unbound Spirit, Varrox Bleakhoof, Elder Shaman Bloodmane) and Alcaz Prison adds Zarla Ober, as on Wowhead's
+  WoW Forever database.
+- WoW Forever: the City of Dalaran's map shows where each boss stands; a new dungeon the game's map can't be found for by
+  name is drawn from the map its bosses are on.
+- WoW Forever: raids that haven't opened there are left out of the journal (and Prev/Next); "Show raids not open on
+  Forever" at the bottom of the dungeon menu brings them back, marked.
+
 v1.1.8
 - WoW Forever: the original dungeons' level ranges are Forever's now - Ragefire Chasm 15-25, The Deadmines 15-25, Razorfen Kraul 32-42, Maraudon 42-52, Dire Maul 44-54,
   Stratholme 48-58 and others. Classic Era keeps Classic's ranges.

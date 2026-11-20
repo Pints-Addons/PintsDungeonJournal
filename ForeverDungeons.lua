@@ -177,6 +177,7 @@ Add({ -1007, "Alcaz Prison", "Dustwallow Marsh", 48, 53, 0, { "The Questioner", 
 		{ "Tidemistress Ca'zass", "?", { Named("Cloak of the Tidemistress", 16, 401), 0 } },
 		{ "Overseer Wrex", "?", { Named("Wrex's Pinky Ring", 11, 400), 0 } },
 		{ "Katerina the Cleaner", "?", { Named("Sentimental Locket", 2, 400), 0 } },
+		{ "Zarla Ober", "?", {} },
 		{ "The Questioner", "?", { Named("Girdle of Extracted Answers", 6, 404), 0 } },
 		{ "Blazeroar", "?", {} },
 	} })
@@ -184,7 +185,13 @@ Add({ -1007, "Alcaz Prison", "Dustwallow Marsh", 48, 53, 0, { "The Questioner", 
 Add({ -1008, "Blackmaw Hold", "Azshara", 55, 60, 0, { "Varrox Bleakhoof" },
 	"A furbolg city in Azshara, built where a gate was meant to lead to Timbermaw Hold. The Blackmaw clan holds it and fights a deep-rooted corruption - said to be larger even than Blackrock Depths. Reached through a furbolg tunnel; the way in itself sits on the Winterspring side.",
 	{
-		{ "Varrox Bleakhoof", "?", {} },
+		{ "Withermaw", "?", { 280062, 0, 280063, 0, 280064, 0 } },
+		{ "Bonesnout the Unbroken", "?", { 280059, 0, 280060, 0, 280061, 0 } },
+		{ "Moontouched Wanderer", "?", { 280079, 0, 280080, 0 } },
+		{ "Impaan the Imprisoner", "?", { 280056, 0, 280057, 0, 280058, 0 } },
+		{ "Unbound Spirit", "?", { 280071, 0, 280072, 0, 280073, 0 } },
+		{ "Varrox Bleakhoof", "?", {  } },
+		{ "Elder Shaman Bloodmane", "?", { 280068, 0, 280070, 0 } },
 	} })
 
 Add({ -1009, "Shaper's Terrace", "Un'Goro Crater", 58, 60, 0, { "Bolt", "Cinder", "Snowtalon", "Nanaya" },
