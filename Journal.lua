@@ -627,15 +627,61 @@ local function BuildPages()
   T.title:SetPoint("RIGHT", T, "RIGHT", -20, 0); T.title:SetJustifyH("LEFT"); T.title:SetWordWrap(false)
   T.info = T:CreateFontString(nil, "OVERLAY", B.F_SMALL); T.info:SetPoint("TOPLEFT", 24, -74); Ink(T.info, B.INK_SOFT)
   local o = B.Ornament(T); o:SetPoint("TOPLEFT", 16, -90); o:SetPoint("TOPRIGHT", -16, -90)
-  T.lore = T:CreateFontString(nil, "OVERLAY", B.F_BODY); T.lore:SetPoint("TOPLEFT", 24, -108); T.lore:SetWidth(B.PAGE_W - 48)
+  -- everything below the ornament scrolls (mouse wheel or the bar at the right edge) when a long tale and a big boss
+  -- checklist run off the page
+  local tsf = CreateFrame("ScrollFrame", nil, T); tsf:SetPoint("TOPLEFT", 0, -100); tsf:SetPoint("BOTTOMRIGHT", -14, 34)
+  local TC = CreateFrame("Frame", nil, tsf); TC:SetSize(B.PAGE_W - 14, 10); tsf:SetScrollChild(TC)
+  T.sf, T.sc = tsf, TC
+  local bar = CreateFrame("Frame", nil, T); bar:SetPoint("TOPRIGHT", T, "TOPRIGHT", -8, -104); bar:SetPoint("BOTTOMRIGHT", T, "BOTTOMRIGHT", -8, 38); bar:SetWidth(8)
+  bar.track = bar:CreateTexture(nil, "BACKGROUND"); bar.track:SetAllPoints(); bar.track:SetColorTexture(0.35, 0.24, 0.12, 0.18)
+  local thumb = CreateFrame("Button", nil, bar); thumb:SetWidth(8); thumb:EnableMouse(true); thumb:RegisterForDrag("LeftButton")
+  thumb.t = thumb:CreateTexture(nil, "ARTWORK"); thumb.t:SetAllPoints(); thumb.t:SetColorTexture(0.48, 0.10, 0.06, 0.75)
+  T.bar, T.thumb = bar, thumb
+  local function MaxScroll() return math.max(0, (TC:GetHeight() or 0) - (tsf:GetHeight() or 0)) end
+  local function Place()
+    local max, h = MaxScroll(), bar:GetHeight() or 1
+    bar:SetShown(max > 2)
+    if max <= 2 then tsf:SetVerticalScroll(0); return end
+    local vis = tsf:GetHeight() or 1
+    local th = math.max(24, h * vis / (vis + max))
+    thumb:SetHeight(th)
+    thumb:ClearAllPoints(); thumb:SetPoint("TOP", bar, "TOP", 0, -(h - th) * (tsf:GetVerticalScroll() / max))
+  end
+  local function ScrollTo(v) tsf:SetVerticalScroll(math.max(0, math.min(MaxScroll(), v))); Place() end
+  tsf:EnableMouseWheel(true)
+  tsf:SetScript("OnMouseWheel", function(_, delta) ScrollTo(tsf:GetVerticalScroll() - delta * 40) end)
+  tsf:SetScript("OnSizeChanged", Place)
+  thumb:SetScript("OnDragStart", function(self)
+    local _, cy = GetCursorPosition(); self.y0, self.v0 = cy / self:GetEffectiveScale(), tsf:GetVerticalScroll()
+    self:SetScript("OnUpdate", function(me)
+      local _, y = GetCursorPosition(); y = y / me:GetEffectiveScale()
+      local h, th = bar:GetHeight() or 1, me:GetHeight() or 1
+      ScrollTo(me.v0 + (me.y0 - y) / math.max(1, h - th) * MaxScroll())
+    end)
+  end)
+  thumb:SetScript("OnDragStop", function(self) self:SetScript("OnUpdate", nil) end)
+  bar:EnableMouse(true)
+  bar:SetScript("OnMouseDown", function(self)
+    local _, cy = GetCursorPosition(); cy = cy / self:GetEffectiveScale()
+    local f = ((self:GetTop() or 0) - cy) / math.max(1, self:GetHeight() or 1)
+    ScrollTo(f * MaxScroll())
+  end)
+  T.Place = Place
+  T.lore = TC:CreateFontString(nil, "OVERLAY", B.F_BODY); T.lore:SetPoint("TOPLEFT", 24, -8); T.lore:SetWidth(B.PAGE_W - 48)
   T.lore:SetJustifyH("LEFT"); T.lore:SetSpacing(4); Ink(T.lore, B.INK)
-  T.finalHead = T:CreateFontString(nil, "OVERLAY", B.F_HEAD); T.finalHead:SetPoint("TOPLEFT", T.lore, "BOTTOMLEFT", 0, -18); Ink(T.finalHead, B.RUBRIC)
-  T.finals = T:CreateFontString(nil, "OVERLAY", B.F_BODY); T.finals:SetPoint("TOPLEFT", T.finalHead, "BOTTOMLEFT", 2, -4)
+  T.finalHead = TC:CreateFontString(nil, "OVERLAY", B.F_HEAD); T.finalHead:SetPoint("TOPLEFT", T.lore, "BOTTOMLEFT", 0, -18); Ink(T.finalHead, B.RUBRIC)
+  T.finals = TC:CreateFontString(nil, "OVERLAY", B.F_BODY); T.finals:SetPoint("TOPLEFT", T.finalHead, "BOTTOMLEFT", 2, -4)
   T.finals:SetWidth(B.PAGE_W - 52); T.finals:SetJustifyH("LEFT"); Ink(T.finals, B.INK)
-  T.statHead = T:CreateFontString(nil, "OVERLAY", B.F_HEAD); T.statHead:SetPoint("TOPLEFT", T.finals, "BOTTOMLEFT", -2, -18); Ink(T.statHead, B.RUBRIC)
+  T.statHead = TC:CreateFontString(nil, "OVERLAY", B.F_HEAD); T.statHead:SetPoint("TOPLEFT", T.finals, "BOTTOMLEFT", -2, -18); Ink(T.statHead, B.RUBRIC)
   T.statHead:SetText("Your deeds here")
-  T.stats = T:CreateFontString(nil, "OVERLAY", B.F_BODY); T.stats:SetPoint("TOPLEFT", T.statHead, "BOTTOMLEFT", 2, -4)
+  T.stats = TC:CreateFontString(nil, "OVERLAY", B.F_BODY); T.stats:SetPoint("TOPLEFT", T.statHead, "BOTTOMLEFT", 2, -4)
   T.stats:SetWidth(B.PAGE_W - 52); T.stats:SetJustifyH("LEFT"); T.stats:SetSpacing(3); Ink(T.stats, B.INK)
+  -- this run's boss checklist: every boss of the dungeon, ticked off as they fall; a new run starts it fresh
+  T.runHead = TC:CreateFontString(nil, "OVERLAY", B.F_HEAD); T.runHead:SetPoint("TOPLEFT", T.stats, "BOTTOMLEFT", -2, -16); Ink(T.runHead, B.RUBRIC)
+  T.runL = TC:CreateFontString(nil, "OVERLAY", B.F_SMALL); T.runL:SetPoint("TOPLEFT", T.runHead, "BOTTOMLEFT", 2, -5)
+  T.runL:SetWidth((B.PAGE_W - 52) / 2); T.runL:SetJustifyH("LEFT"); T.runL:SetSpacing(3); T.runL:SetWordWrap(false); Ink(T.runL, B.INK)
+  T.runR = TC:CreateFontString(nil, "OVERLAY", B.F_SMALL); T.runR:SetPoint("TOPLEFT", T.runL, "TOPRIGHT", 4, 0)
+  T.runR:SetWidth((B.PAGE_W - 52) / 2); T.runR:SetJustifyH("LEFT"); T.runR:SetSpacing(3); T.runR:SetWordWrap(false); Ink(T.runR, B.INK)
 
   -- right page, spread 1: bosses and spoils
   local S = CreateFrame("Frame", nil, R); S:SetAllPoints(); R.spoils = S
@@ -707,6 +753,44 @@ local function BuildPages()
   M.pins = {}
   -- (the game has no map of this dungeon) our own drawn map of it (DrawnMaps.lua, Maps\*.tga)
   M.drawn = M.clip:CreateTexture(nil, "ARTWORK"); M.drawn:SetAllPoints(M.clip); M.drawn:Hide()
+  -- a drawn map zooms (mouse wheel, + and -) and moves (drag it)
+  M.clip:EnableMouse(true); M.clip:EnableMouseWheel(true)
+  M.clip:SetScript("OnMouseWheel", function(self, delta)
+    if not (M.dmap and M.drawn:IsShown()) then return end
+    local x, y = GetCursorPosition(); local sc = self:GetEffectiveScale()
+    local l, t = self:GetLeft(), self:GetTop()
+    NS.DrawnZoom(delta, (x / sc - l) / self:GetWidth(), (t - y / sc) / self:GetHeight())
+  end)
+  M.clip:SetScript("OnMouseDown", function(self, button)
+    if button ~= "LeftButton" or not (M.dmap and M.drawn:IsShown()) then return end
+    local x, y = GetCursorPosition(); local st = NS.DrawnState()
+    if st then self.drag = { x = x, y = y, st = st, u0 = st.u, v0 = st.v } end
+  end)
+  M.clip:SetScript("OnMouseUp", function(self) self.drag = nil end)
+  M.clip:SetScript("OnHide", function(self) self.drag = nil end)
+  M.clip:SetScript("OnUpdate", function(self)
+    local d = self.drag
+    if not d or not d.st then return end
+    if not IsMouseButtonDown("LeftButton") then self.drag = nil return end
+    local x, y = GetCursorPosition(); local sc = self:GetEffectiveScale()
+    local w = self:GetWidth() * sc
+    d.st.u = d.u0 - (x - d.x) / w / d.st.z
+    d.st.v = d.v0 + (y - d.y) / w / d.st.z
+    NS.DrawnLayout()
+  end)
+  M.zoomBar = CreateFrame("Frame", nil, M); M.zoomBar:SetSize(220, 18); M.zoomBar:Hide()
+  M.zoomBar.t = M.zoomBar:CreateFontString(nil, "OVERLAY", B.F_SMALL); Ink(M.zoomBar.t, B.INK_SOFT)
+  local function ZBtn(label, x, fn)
+    local b = CreateFrame("Button", nil, M.zoomBar); b:SetSize(22, 18); b:SetPoint("RIGHT", M.zoomBar, "RIGHT", x, 0)
+    b.t = b:CreateFontString(nil, "OVERLAY", B.F_BODY); b.t:SetPoint("CENTER"); b.t:SetText(label); Ink(b.t, B.RUBRIC)
+    b:SetScript("OnClick", fn)
+    b:SetScript("OnEnter", function(self) self.t:SetAlpha(0.6) end); b:SetScript("OnLeave", function(self) self.t:SetAlpha(1) end)
+    return b
+  end
+  local reset = ZBtn("1:1", 0, function() NS.DrawnZoom(0) end); reset:SetWidth(30)
+  ZBtn("-", -32, function() NS.DrawnZoom(-1, 0.5, 0.5) end)
+  ZBtn("+", -56, function() NS.DrawnZoom(1, 0.5, 0.5) end)
+  M.zoomBar.t:SetPoint("RIGHT", M.zoomBar, "RIGHT", -82, 0)
 
   -- right page, spread 2: one run in full
   local Dt = CreateFrame("Frame", nil, R); Dt:SetAllPoints(); R.detail = Dt
@@ -876,6 +960,43 @@ local function RenderTale(d)
       #run.bosses == 1 and "" or "es", #run.loot, #run.loot == 1 and "" or "s")
   end
   T.stats:SetText(table.concat(lines, "\n"))
+  -- the checklist for this run (or, if you're not on one here, the bosses waiting for your next)
+  local onRun = run and run.dun == jIdx
+  local done = {}
+  if onRun then for _, b in ipairs(run.bosses) do done[b] = true end end
+  local n, got = #d[9], 0
+  local rows = {}
+  for _, b in ipairs(d[9]) do
+    local nm = b[1]
+    if done[nm] then
+      got = got + 1
+      rows[#rows + 1] = "|TInterface\\RaidFrame\\ReadyCheck-Ready:13:13|t |cff8a7a60" .. nm .. "|r"
+    else
+      rows[#rows + 1] = "|TInterface\\RaidFrame\\ReadyCheck-Waiting:13:13|t " .. nm
+    end
+  end
+  if onRun then
+    T.runHead:SetText(("This run  |cff5a4020%d of %d|r"):format(got, n) .. (got == n and n > 0 and "  |cff1a6a1a- cleared!|r" or ""))
+  else
+    T.runHead:SetText("This run  |cff5a4020(starts when you walk in)|r")
+  end
+  local half = n > 8 and math.ceil(n / 2) or n
+  local l, r = {}, {}
+  for i, row in ipairs(rows) do if i <= half then l[#l + 1] = row else r[#r + 1] = row end end
+  T.runL:SetWidth(n > 8 and (NS.Book.PAGE_W - 52) / 2 or (NS.Book.PAGE_W - 52))
+  T.runL:SetText(table.concat(l, "\n")); T.runR:SetText(table.concat(r, "\n"))
+  T.runR:SetShown(#r > 0)
+  -- size the scrolled text to its contents, back to the top, and place the bar
+  local top = T.sc:GetTop()
+  local bottom = math.min(T.runL:GetBottom() or 0, (#r > 0 and T.runR:GetBottom()) or math.huge)
+  local h = (top and bottom and bottom > 0) and (top - bottom + 12) or 600
+  T.sc:SetHeight(math.max(10, h)); T.sf:SetVerticalScroll(0)
+  if C_Timer then C_Timer.After(0, function()     -- (text sizes settle a frame later)
+    local t2, b2 = T.sc:GetTop(), math.min(T.runL:GetBottom() or 0, (T.runR:IsShown() and T.runR:GetBottom()) or math.huge)
+    if t2 and b2 and b2 > 0 then T.sc:SetHeight(math.max(10, t2 - b2 + 12)) end
+    T.Place()
+  end) end
+  T.Place()
 end
 
 local function RenderSpoils(d)
@@ -1217,13 +1338,85 @@ local function PlaceEntrance(M, n, label, px, py)
   e.t:SetText(label)
   e:ClearAllPoints(); e:SetPoint("CENTER", M.clip, "TOPLEFT", px, -py); e:Show()
 end
+-- drawn maps: how far in each is zoomed, and which part is in view (u, v: the top-left corner, 0-1 across the map)
+local dzoom = {}
+function NS.DrawnState()
+  local s = L.map and L.map.dmap
+  if not s then return nil end
+  local st = dzoom[s.key]
+  if not st then st = { z = 1, u = 0, v = 0 }; dzoom[s.key] = st end
+  return st
+end
+function NS.DrawnLayout()
+  local M = L.map
+  local s, st = M and M.dmap, NS.DrawnState()
+  if not (s and st) then return end
+  local span = 1 / st.z
+  st.u = math.max(0, math.min(1 - span, st.u)); st.v = math.max(0, math.min(1 - span, st.v))
+  M.drawn:SetTexCoord(st.u, st.u + span, st.v, st.v + span)
+  local side = s.side
+  for n, b in ipairs(s.dm[2]) do PlacePin(M, n, b[1], b[2], (b[3] - st.u) * st.z * side, (b[4] - st.v) * st.z * side) end
+  for n, e in ipairs(s.dm[3] or {}) do PlaceEntrance(M, n, e[1], (e[2] - st.u) * st.z * side, (e[3] - st.v) * st.z * side) end
+  NS.DrawnYou()
+  M.zoomBar.t:SetText(st.z > 1 and (("%d%%  -  drag to move"):format(math.floor(st.z * 100 + 0.5))) or "mouse wheel to zoom")
+  M.zoomBar:Show()
+end
+-- you, on a drawn map: the game's position of you (when it gives one inside the dungeon) through the map's own
+-- world -> map transform (dm[4] = { A, B, C, D }: across = A * y + B, down = C * x + D)
+function NS.DrawnYou()
+  local M = L.map
+  local s, st = M and M.dmap, NS.DrawnState()
+  local xf = s and s.dm[4]
+  if not (s and st and xf and UnitPosition) then if M and M.you then M.you:Hide() end return end
+  local inst = select(8, GetInstanceInfo())
+  local a, b, z = UnitPosition("player")
+  if not (a and b) or (s.inst and s.inst > 0 and inst ~= s.inst) then M.you:Hide() return end
+  local zr = s.dm.zr     -- a floor drawn for one height only: hide "you" when you're on another floor
+  if zr and z and (z < zr[1] or z > zr[2]) then M.you:Hide() return end
+  local fx, fy
+  if #xf == 6 then       -- (a map drawn turned a little: the full transform)
+    fx, fy = xf[1] * a + xf[2] * b + xf[3], xf[4] * a + xf[5] * b + xf[6]
+    if fx < 0 or fx > 1 or fy < 0 or fy > 1 then fx, fy = xf[1] * b + xf[2] * a + xf[3], xf[4] * b + xf[5] * a + xf[6] end
+  else
+    fx, fy = xf[1] * b + xf[2], xf[3] * a + xf[4]
+    if fx < 0 or fx > 1 or fy < 0 or fy > 1 then fx, fy = xf[1] * a + xf[2], xf[3] * b + xf[4] end   -- (the other axis order)
+  end
+  if fx < 0 or fx > 1 or fy < 0 or fy > 1 then M.you:Hide() return end
+  M.you:ClearAllPoints(); M.you:SetPoint("CENTER", M.clip, "TOPLEFT", (fx - st.u) * st.z * s.side, -(fy - st.v) * st.z * s.side)
+  if GetPlayerFacing and M.you.SetRotation then local f = GetPlayerFacing(); if f then M.you:SetRotation(f) end end
+  M.you:Show()
+end
+do  -- keep "you" moving while the drawn map is open
+  local tick, acc = CreateFrame("Frame"), 0
+  tick:SetScript("OnUpdate", function(_, e)
+    acc = acc + e
+    if acc < 0.1 then return end
+    acc = 0
+    local M = L and L.map
+    if M and M.dmap and M.drawn:IsShown() and M:IsVisible() then NS.DrawnYou() end
+  end)
+end
+-- delta > 0 in, < 0 out, 0 back to the whole map; cx, cy: the point to keep still (0-1 across the view)
+function NS.DrawnZoom(delta, cx, cy)
+  local st = NS.DrawnState()
+  if not st then return end
+  if delta == 0 then st.z, st.u, st.v = 1, 0, 0
+  else
+    cx, cy = cx or 0.5, cy or 0.5
+    local px, py = st.u + cx / st.z, st.v + cy / st.z
+    st.z = math.max(1, math.min(6, st.z * (delta > 0 and 1.5 or 1 / 1.5)))
+    st.u, st.v = px - cx / st.z, py - cy / st.z
+  end
+  NS.DrawnLayout()
+end
+NS.TAB_W = 96
 local function RenderMap(d)
   local M, B = L.map, NS.Book
   M.chapter:SetText("~ " .. d[2] .. " ~")
   local list = MapsFor(d)
   for _, t in ipairs(M.tiles) do t:Hide() end
   for _, f in ipairs(M.floors) do f:Hide() end
-  M.you:Hide(); M.drawn:Hide()
+  M.you:Hide(); M.drawn:Hide(); M.dmap = nil; M.zoomBar:Hide()
   for _, e in ipairs(M.ents or {}) do e:Hide() end
   for _, p in ipairs(M.pins) do p:Hide() end
   -- WoW Forever's new dungeons: the boss spots from Wowhead name the game's own map they're on - when the map couldn't be
@@ -1238,7 +1431,12 @@ local function RenderMap(d)
         seen[id] = true
         local ok, info = pcall(C_Map.GetMapInfo, id)
         local okL, layers = pcall(C_Map.GetMapArtLayers, id)
-        if ok and info and okL and layers and layers[1] then list[#list + 1] = { id = id, name = info.name, floor = info.name } end
+        -- (only a map of the dungeon itself - not the zone outside it, which is all some of them are on)
+        local DUNGEON = (Enum and Enum.UIMapType and Enum.UIMapType.Dungeon) or 4
+        local MICRO = (Enum and Enum.UIMapType and Enum.UIMapType.Micro) or 5
+        if ok and info and (info.mapType == DUNGEON or info.mapType == MICRO) and okL and layers and layers[1] then
+          list[#list + 1] = { id = id, name = info.name, floor = info.name }
+        end
       end
     end
   end
@@ -1251,13 +1449,47 @@ local function RenderMap(d)
     if dm then
       -- a drawn sketch of the halls (from where every creature and object stands), with the bosses on it
       M.empty:Hide()
-      M.sub:SetText(d[3] .. "  -  levels " .. d[4] .. "-" .. d[5] .. "  -  drawn map (not the game's), north is up")
-      local top = 80
-      local side = math.min(B.PAGE_W - 48, B.PAGE_H - top - 30)
-      M.clip:ClearAllPoints(); M.clip:SetPoint("TOP", M, "TOP", 0, -top); M.clip:SetSize(side, side); M.clip:Show(); M.edge:Show()
-      M.drawn:SetTexture("Interface\\AddOns\\PintsDungeonJournal\\Maps\\" .. dm[1]); M.drawn:Show()
-      for n, b in ipairs(dm[2]) do PlacePin(M, n, b[1], b[2], b[3] * side, b[4] * side) end
-      for n, e in ipairs(dm[3] or {}) do PlaceEntrance(M, n, e[1], e[2] * side, e[3] * side) end
+      -- a dungeon drawn floor by floor: { floors = { { texture, name, pins, entrances, transform }, ... } }
+      local cur, key, fname = dm, d[2], nil
+      if dm.floors then
+        local fl = dm.floors
+        local fi = math.min(mapFloor[jIdx] or dm.start or 1, #fl)
+        local F = fl[fi]
+        cur, key, fname = { F[1], F[3] or {}, F[4] or {}, F[5], zr = F[6] }, d[2] .. "#" .. fi, F[2]
+        -- floor tabs down the left side of the map
+        for i, f in ipairs(fl) do
+          local bt = M.floors[i]
+          if not bt then
+            bt = CreateFrame("Button", nil, M)
+            bt.bg = bt:CreateTexture(nil, "BACKGROUND"); bt.bg:SetAllPoints()
+            bt.edge = bt:CreateTexture(nil, "BORDER"); bt.edge:SetPoint("TOPRIGHT"); bt.edge:SetPoint("BOTTOMRIGHT"); bt.edge:SetWidth(3)
+            bt.t = bt:CreateFontString(nil, "OVERLAY", B.F_SMALL); bt.t:SetPoint("LEFT", 6, 0); bt.t:SetPoint("RIGHT", -6, 0)
+            bt.t:SetJustifyH("LEFT"); bt.t:SetWordWrap(true)
+            bt:SetScript("OnClick", function(self) mapFloor[jIdx] = self.i; NS.RenderJournal() end)
+            bt:SetScript("OnEnter", function(self) self.t:SetAlpha(0.7) end); bt:SetScript("OnLeave", function(self) self.t:SetAlpha(1) end)
+            M.floors[i] = bt
+          end
+          bt.i = i
+          local sel = (i == fi)
+          bt.bg:SetColorTexture(sel and 0.50 or 0.36, sel and 0.16 or 0.24, sel and 0.10 or 0.12, sel and 0.40 or 0.16)
+          bt.edge:SetColorTexture(0.55, 0.10, 0.06, sel and 0.9 or 0)
+          bt.t:SetText((sel and "|cff8a1010" or "|cff5a4020") .. f[2] .. "|r")
+          bt:SetSize(NS.TAB_W, 30)
+          bt:ClearAllPoints(); bt:SetPoint("TOPLEFT", M, "TOPLEFT", 20, -80 - (i - 1) * 33); bt:Show()
+        end
+      end
+      M.sub:SetText(fname and (d[3] .. "  -  drawn map, floor: " .. fname) or (d[3] .. "  -  levels " .. d[4] .. "-" .. d[5] .. "  -  drawn map (not the game's), north is up"))
+      local top, tabs = 80, dm.floors and (NS.TAB_W + 8) or 0
+      local side = math.min(B.PAGE_W - 48 - tabs, B.PAGE_H - top - 30)
+      M.clip:ClearAllPoints()
+      if tabs > 0 then M.clip:SetPoint("TOPLEFT", M, "TOPLEFT", 20 + tabs, -top) else M.clip:SetPoint("TOP", M, "TOP", 0, -top) end
+      M.clip:SetSize(side, side); M.clip:Show(); M.edge:Show()
+      M.drawn:SetTexture("Interface\\AddOns\\PintsDungeonJournal\\Maps\\" .. cur[1]); M.drawn:Show()
+      for _, p in ipairs(M.pins) do p:Hide() end
+      for _, e in ipairs(M.ents or {}) do e:Hide() end
+      M.dmap = { dm = cur, side = side, key = key, inst = d[1] }
+      M.zoomBar:ClearAllPoints(); M.zoomBar:SetPoint("TOPRIGHT", M.clip, "BOTTOMRIGHT", 0, -4)
+      NS.DrawnLayout()
     end
     return
   end
@@ -1277,6 +1509,7 @@ local function RenderMap(d)
       M.floors[i] = b
     end
     b.i = i
+    if b.bg then b.bg:SetColorTexture(0, 0, 0, 0); b.edge:SetColorTexture(0, 0, 0, 0); b:SetHeight(18) end   -- (a drawn map's tab, reused)
     b.t:SetText((i == fi and "|cff8a1010" or "|cff5a4020") .. (f.floor or ("Floor " .. i)) .. "|r")
     b:SetWidth(b.t:GetStringWidth() + 10)
     if #list > 1 then b:ClearAllPoints(); b:SetPoint("TOPLEFT", M, "TOPLEFT", x, -76); b:Show(); x = x + b:GetWidth() + 4 end

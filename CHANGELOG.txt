@@ -1,5 +1,42 @@
 Pint's Dungeon Journal - Changelog
 
+v1.1.11
+- This run: a boss checklist on each dungeon's first page, under Your deeds here - every boss, ticked off as it falls in
+  the run you're on, with a count (and "cleared!" once they're all down). A new run starts it fresh.
+- A dungeon's first page scrolls (mouse wheel or a bar at the page's edge) when its tale and checklist run off the page.
+- Shadowfang Keep is drawn floor by floor, all seven levels: hand-traced from the layout of Blizzard's floor maps and
+  redrawn in parchment and ink - in the order you go through it - the courtyard (the cells, the kitchen, the dining hall and the Courtyard
+  Door), the upper floors, the stair tower, the wall walk, Fenrus' den, the upper keep and Arugal's chamber, each boss
+  marked where it stands. "You" shows on the courtyard level.
+- Floor tabs: a dungeon drawn floor by floor lists its floors as tabs down the left side of the map.
+- WoW Forever: the new dungeons get drawn maps too, starting with the Hall of Thanes (the entry hall, Anvilmar's Rest and
+  its tombs, Plunder's hall, Magmatus' cavern, the crystal chasm and Durgen's seat) and the Ruins of Lordaeron (the walled
+  capital: the throne room and its pools, the courtyard, the walled avenues and plazas, the canals) and the Excavation Site: Wetlands (the road in, Saltspine's lake, the creek
+  and Shadetooth's thicket, the titan dig) and the Drowned City (the walled court and its lagoon, the Altar of the
+  Serpent, the Deep Archives, the causeway to the serpent's shrine, the Sunken Hollow), and Krol'dok Stronghold (the ogres' heaped-stone
+  walls and hide-roofed towers up the valley, the gate fort, the great bridge, the high keeps; bosses numbered in order), and Alcaz Prison (the cell corridor and
+  its gates, the flooded ward, the Main Unit's cell blocks, Matarius' cell, the chapel ward and the great hall), and Blackmaw Hold, six level tabs (the grove and its
+  lake and thicket, the Festering Grotto, the Fallen Grove's root tunnels, the Elders, the Burrow, the Forbidden Magic), and Shaper's Terrace (a plan from the published route: the
+  ring round the crater, the paved road, the four Archival Panels, the tar pits and the Pillar of Assimilation).
+- Stratholme is one walled city drawn with two tabs, Live Side and Dead Side: curtain walls and towers, the gatehouses,
+  the streets and alleys between the house blocks, the ziggurats. Either side's journal entry opens it on its own tab.
+- WoW Forever: a dungeon whose bosses Wowhead shows only on the zone outside (the City of Dalaran) no longer draws that
+  zone map as if it were the dungeon's.
+- Drawn maps: the game has no map of the Classic dungeons, so the journal draws its own - a plan of the halls with the
+  bosses and the entrance marked. First one: Scarlet Monastery: Cathedral.
+- Drawn maps zoom: mouse wheel (or + and -) zooms in up to 6x on the spot under the cursor, drag to move around,
+  1:1 shows the whole map again.
+- Drawn maps are now detailed, lit plans: Scarlet Monastery: Cathedral redrawn (tiled nave and transept with pews and
+  braziers, the courtyard's pool and fountain, trees and cloisters), and Blackrock Depths added - the lava lake and
+  rivers glowing, the Ring of Law, the Grim Guzzler, the Detention Block's cells, the Lyceum's braziers, the Imperial
+  Seat, all 20 bosses marked.
+- Drawn maps for the other Classic dungeons too: Ragefire Chasm, Wailing Caverns, the Deadmines, Shadowfang Keep,
+  Blackfathom Deeps, the Stockade, Gnomeregan, Razorfen Kraul and Downs, Scarlet Monastery's Library, Uldaman, Maraudon,
+  the Sunken Temple, Dire Maul (East, West, North), Scholomance and Stratholme (both sides) - each lined up with where
+  the creatures stand, bosses and entrance marked. Where the drawn floor isn't the boss's (Shadowfang's towers), the
+  boss is marked where it stands, over the floor shown.
+- Drawn maps show you on them (the minimap arrow, facing your way) when the game gives your position in the dungeon.
+
 v1.1.10
 - WoW Forever: the Classic dungeons and raids checked against Wowhead's WoW Forever database - every boss is still
   there at the same level. Razorfen Downs gains the boss Forever added, Virulent Blood of Agamaggan (level 42), and
