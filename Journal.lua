@@ -111,8 +111,12 @@ local function BuildCanUse()
 end
 -- usable = this class may wear or wield it; a level requirement does not count against it
 local function Usable(id)
-  local it = ITEMS[id]; if not it then return true end
   if not canUse then BuildCanUse() end
+  -- gear made for other classes only ("Classes: Priest"), when the data has no class list for it (WoW Forever's items)
+  local CS = _G.CraftUpgradesScore
+  local it = ITEMS[id]
+  if (not it or not it[5] or it[5] == 0) and CS and CS.ClassOK and canUse.cls and not CS.ClassOK(id, canUse.cls) then return false end
+  if not it then return true end
   local mask = it[5]
   if mask and mask > 0 and canUse.bit > 0 and (math.floor(mask / canUse.bit) % 2) == 0 then return false end
   local cls, sub = math.floor(it[2] / 100), it[2] % 100

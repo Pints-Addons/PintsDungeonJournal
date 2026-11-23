@@ -1,5 +1,9 @@
 Pint's Dungeon Journal - Changelog
 
+v1.1.12
+- Loot lists: gear made for other classes only ("Classes: Priest") counts as not usable for your class - WoW Forever's
+  items too, read from the item itself when the data has no class list (with Pint's Craft Upgrades).
+
 v1.1.11
 - This run: a boss checklist on each dungeon's first page, under Your deeds here - every boss, ticked off as it falls in
   the run you're on, with a count (and "cleared!" once they're all down). A new run starts it fresh.
