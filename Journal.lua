@@ -89,7 +89,7 @@ end
 local WEAPONS = {   -- weapon subclasses each class can learn
   WARRIOR = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 13, 15, 16, 18 },
   PALADIN = { 0, 1, 4, 5, 6, 7, 8 },
-  HUNTER  = { 0, 1, 2, 3, 6, 7, 8, 10, 13, 15, 16, 18 },
+  HUNTER  = { 0, 1, 2, 3, 6, 7, 8, 10, 13, 15, 18 },
   ROGUE   = { 2, 3, 4, 7, 13, 15, 16, 18 },
   PRIEST  = { 4, 10, 15, 19 },
   SHAMAN  = { 0, 1, 4, 5, 10, 13, 15 },
